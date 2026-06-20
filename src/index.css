@@ -1,0 +1,48 @@
+@import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@700;800;900&family=Inter:wght@400;500;600;700&display=swap');
+@import url('https://unpkg.com/leaflet@1.9.4/dist/leaflet.css');
+@import "tailwindcss";
+
+@theme {
+  --font-display: "Montserrat", sans-serif;
+  --font-sans: "Inter", sans-serif;
+
+  --color-brand-blue: #0066FF;
+  --color-brand-orange: #FF6600;
+  --color-brand-green: #25D366;
+  
+  --color-surface-deep: #0A0A0B;
+  --color-surface-panel: #121214;
+  --color-surface-item: #1F1F23;
+}
+
+@layer base {
+  body {
+    @apply bg-surface-deep text-white font-sans overflow-x-hidden;
+  }
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.glass-morphism {
+  @apply backdrop-blur-md bg-white/10 border border-white/20;
+}
+
+.sidebar-active-gradient {
+  @apply bg-gradient-to-r from-brand-blue/20 to-transparent border-l-2 border-brand-blue;
+}
+
+.video-container {
+  height: calc(100vh - 80px);
+}
+
+@media (min-width: 768px) {
+  .video-container {
+    height: 100vh;
+  }
+}
