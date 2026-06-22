@@ -1,5 +1,5 @@
 # Issue 39: Consulta Assíncrona de Cupom no Feed de Vídeos (AdVideo.tsx)
-**Data de Geração:** 19 de Junho de 2026 às 22:27:48 (Horário de Brasília)
+**Data de Geração:** 22 de Junho de 2026 às 15:43:21 (Horário de Brasília)
 
 ## 1. Descrição dos Requisitos de Implementação
 O player de vídeos na visualização vertical de feed de anúncios (`AdVideo.tsx`) possui overlays em tempo real que lidam com apresentações interativas de ofertas e cupons de descontos anexados aos anúncios (`ad.couponId`). Este item trata de consolidar a simetria de dados de forma puramente dinâmica, eliminando qualquer dependência estática por meio do serviço de consulta assíncrona.

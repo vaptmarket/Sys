@@ -1,5 +1,5 @@
 # Especificações Técnicas (Spec) - Pendências de Finalização
-**Data de Geração:** 19 de Junho de 2026 às 22:27:48 (Horário de Brasília)
+**Data de Geração:** 22 de Junho de 2026 às 15:43:21 (Horário de Brasília)
 
 Este documento descreve detalhadamente as especificações de comportamento de interface (UI/UX), fluxo de dados assíncronos e gerenciados de estado que faltam implementar no **Vapt Market**, baseando-se estritamente nas finalizações de rotas identificadas no arquivo `/analytics/report.md`.
 
@@ -9,7 +9,7 @@ Este documento descreve detalhadamente as especificações de comportamento de i
 
 ### 1.1. Propósito e Tela
 *   **Comportamento:** Elemento interativo sobreposto ao vídeo em loop no feed vertical secundário.
-*   **Ação de Finalização:** Substituição completa do consumo residual de dados estáticos pelo carregamento assíncrono indexado.
+*   **Ação de Finalização:** Substituição completa do consumo de referências genéricas ou estáticas de cupons de descontos para recuperar do banco de dados em tempo real.
 
 ### 1.2. Especificação de Comportamento & Requisitos de UX
 1.  **Carregamento de Cupom:**

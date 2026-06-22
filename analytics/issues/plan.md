@@ -1,5 +1,5 @@
 # Plano de Pesquisa e Implementação - Validação de Pendências de Integração
-**Data de Geração:** 19 de Junho de 2026 às 22:27:48 (Horário de Brasília)
+**Data de Geração:** 22 de Junho de 2026 às 15:43:21 (Horário de Brasília)
 
 Este plano traça as estratégias de desenvolvimento de software, análises de fluxo de dados assíncronos e procedimentos de validação de interface para guiar a finalização das tarefas delineadas nas **Issues 39 e 40**, assegurando um acoplamento 100% livre de erros e reativo sobre a nossa infraestrutura.
 
@@ -39,7 +39,7 @@ Este plano traça as estratégias de desenvolvimento de software, análises de f
 
 ---
 
-## 2. Planejamento de Sincronização e Eventos (Layout.tsx & Admin.tsx)
+## 2. Planning de Sincronização e Eventos (Layout.tsx & Admin.tsx)
 
 ### 2.1. Estrutura do Barramento de Eventos
 *   O emulador em `src/services/mockFirebase.ts` possui a instância pub/sub reativa de gerenciamento de eventos sob o barramento `events`.
@@ -49,7 +49,7 @@ Este plano traça as estratégias de desenvolvimento de software, análises de f
         *   Efetuar carga no carregamento inicial (`notificationService.getAll()`).
         *   Assinar com `events.subscribe('notifications_updated', ...)` atualizando o estado interno de novos badges.
         *   Concluir a ação de "Marcar todas como lidas" disparando `notificationService.markAllAsRead()` e dispersando o evento ao final de forma a limpar todo o painel de forma instantânea.
-    2.  **Gatatilhos de Notificação no Painel Admin (`Admin.tsx`):**
+    2.  **Gatilhos de Notificação no Painel Admin (`Admin.tsx`):**
         *   Em todas as ações administrativas de moderação (`handleApproveAd`, `handleRejectAd`, `handleApproveCompany`, `handleRejectCompany`), garantir que o serviço de alertas seja acrescido da nova transação, emitindo em seguida o sinal de broadcast no canal `'notifications_updated'`.
 
 ### 2.2. Protocolo de Testes e Validação

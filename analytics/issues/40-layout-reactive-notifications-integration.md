@@ -1,5 +1,5 @@
 # Issue 40: Central de Alertas e Notificações Dinâmicas (Layout.tsx)
-**Data de Geração:** 19 de Junho de 2026 às 22:27:48 (Horário de Brasília)
+**Data de Geração:** 22 de Junho de 2026 às 15:43:21 (Horário de Brasília)
 
 ## 1. Descrição dos Requisitos de Implementação
 A central de acompanhamento de status do usuário (sino de alertas no topo direito do `Layout.tsx`) necessita estar ativamente integrada por broadcast ao painel de gerenciamento administrativo (`Admin.tsx`), sincronizando de forma transparente as interações que acontecem em backstage sem obrigar o anunciante a efetuar atualizações (refresh) manuais de tela inteira.
