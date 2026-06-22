@@ -1,17 +1,15 @@
 # Issue 39: Consulta Assíncrona de Cupom no Feed de Vídeos (AdVideo.tsx)
-**Data de Geração:** 19 de Junho de 2026 às 21:24:24 (Horário de Brasília)
+**Data de Geração:** 19 de Junho de 2026 às 22:27:48 (Horário de Brasília)
 
-## Descrição de Requisitos de Implementação
-O componente overlay do feed em formato de video (`/src/components/AdVideo.tsx`) possui ganchos interativos para exibição de códigos promocionais associados às publicações. É crucial assegurar que a vinculação destes cupons com o anúncio seja robusta e inteiramente reativa usando `couponService.getById(ad.couponId)` no emulador local.
+## 1. Descrição dos Requisitos de Implementação
+O player de vídeos na visualização vertical de feed de anúncios (`AdVideo.tsx`) possui overlays em tempo real que lidam com apresentações interativas de ofertas e cupons de descontos anexados aos anúncios (`ad.couponId`). Este item trata de consolidar a simetria de dados de forma puramente dinâmica, eliminando qualquer dependência estática por meio do serviço de consulta assíncrona.
 
-## Passos Detalhados de Especificação
-1.  **Remoção de referências estáticas:**
-    *   Certificar a supressão de referências diretas a hashes de dados estáticos (`MOCK_COUPONS`) para garantir que novos códigos persistidos dinamicamente no painel administrativo carreguem sem exceções.
-2.  **Abordagem Reativa do Hook de Inicialização:**
-    *   Declarar o estado `coupon` no componente `AdVideo.tsx` como `Coupon | null`.
-    *   Injetar um `useEffect` controlado que observe as atualizações da prop `ad.couponId`.
-    *   Disparar o fetch assíncrono via `couponService.getById(ad.couponId)`.
-    *   Prevenir concorrência de rede em scroll rápido com flag ativa que limpa o estado na desmontagem.
-3.  **Controle de Visibilidade da Interface (Modais e Botões):**
-    *   Verificar se o estado local do cupom está populado e válido antes de expor os botões e triggers interativos de cópia de cupom.
-    *   Caso contráio, omitir o ícone de tickets do overlay de forma transparente e limpa.
+## 2. Passos Detalhados de Especificação
+*   **Substituição Estática Conclusiva:**
+    *   Remover referências residuais a coleções estáticas do tipo `MOCK_COUPONS` na vinculação de cupons no player de vídeo.
+*   **Hook de Carga de Cupom com Prevenção de Concorrência:**
+    *   Configurar o estado local `const [coupon, setCoupon] = useState<Coupon | null>(null)` de forma reativa.
+    *   Controlar alterações da propriedade de código promocional (`ad.couponId`) com um hook `useEffect`.
+    *   Garantir integridade de concorrência com travas simples de desmontagem (`let active = true`), evitando que rolagem vertical rápida em coleções assíncronas cause re-renderizações desordenadas de cupons errados.
+*   **Design de Casos de Fallback na UI/UX:**
+    *   Se no final do ciclo assíncrono o código não corresponder mais a nenhum documento no banco de dados local (por exemplo, cupom expirado ou removido pelo lojista), o link ou bilhete interativo de resgate do cupom sobreposto ao feed deve ser ocultado de forma autônoma e limpa.

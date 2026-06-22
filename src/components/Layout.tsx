@@ -267,8 +267,8 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             <span className="text-[7px] font-black uppercase tracking-widest">Canais</span>
           </NavLink>
           <div className="relative flex-1 flex justify-center -top-4">
-            <Link to="/anunciar" className="w-14 h-14 bg-brand-blue rounded-full flex items-center justify-center border-4 border-surface-deep shadow-xl transition-transform active:scale-95">
-              <PlusCircle size={28} className="text-white" />
+            <Link to="/cupons" className="w-14 h-14 bg-brand-orange rounded-full flex items-center justify-center border-4 border-surface-deep shadow-xl transition-transform active:scale-95">
+              <Ticket size={28} className="text-white" />
             </Link>
           </div>
           <NavLink to="/busca" className={({ isActive }) => cn("flex flex-col items-center gap-1 flex-1 py-1 transition-all", isActive ? "text-brand-blue scale-110" : "text-white/40")}>

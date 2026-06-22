@@ -37,8 +37,10 @@ import { useAuth } from '../hooks/useAuth';
 import { Helmet } from 'react-helmet-async';
 import toast from 'react-hot-toast';
 
+import { Navigate } from 'react-router-dom';
+
 export default function Profile() {
-  const { user, isAuthenticated, login, logout, updateProfile } = useAuth();
+  const { user, isAuthenticated, loading, login, logout, updateProfile } = useAuth();
   const [activeTab, setActiveTab] = React.useState<'saved' | 'coupons' | 'company' | 'statistics' | 'history'>('saved');
   const [savedAds, setSavedAds] = React.useState<Ad[]>([]);
   const [userCoupons, setUserCoupons] = React.useState<UserCoupon[]>([]);
@@ -240,30 +242,17 @@ export default function Profile() {
     };
   }, [fetchData, user]);
 
-  if (!isAuthenticated) {
+  if (loading) {
     return (
-      <div className="py-20 flex flex-col items-center justify-center text-center space-y-8">
-        <Helmet>
-          <title>Entrar | Vapt Market</title>
-        </Helmet>
-        <div className="w-24 h-24 bg-brand-blue/10 rounded-[2rem] flex items-center justify-center text-brand-blue">
-          <UserIcon size={48} />
-        </div>
-        <div className="space-y-2">
-          <h1 className="text-3xl font-black text-white italic uppercase tracking-tighter">Sua conta Vapt</h1>
-          <p className="text-white/40 text-sm font-medium max-w-xs mx-auto">
-            Acesse seus anúncios salvos, cupons e histórico de ofertas em um só lugar.
-          </p>
-        </div>
-        <button 
-          onClick={login}
-          className="flex items-center gap-3 px-12 py-4 bg-brand-blue text-white rounded-2xl font-black uppercase tracking-widest text-xs shadow-2xl shadow-brand-blue/40 transform hover:scale-105 active:scale-95 transition-all"
-        >
-          <LogIn size={18} />
-          Entrar com Google
-        </button>
+      <div className="min-h-[60vh] flex flex-col items-center justify-center space-y-6">
+        <div className="w-12 h-12 border-4 border-brand-blue/20 border-t-brand-blue rounded-full animate-spin" />
+        <p className="text-[10px] font-black text-white/20 uppercase tracking-[0.2em] animate-pulse">Sincronizando Sessão...</p>
       </div>
     );
+  }
+
+  if (!isAuthenticated) {
+    return <Navigate to="/login" replace />;
   }
 
   return (

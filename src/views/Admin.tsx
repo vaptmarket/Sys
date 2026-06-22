@@ -46,7 +46,7 @@ import AdEditor from '../components/AdEditor';
 import ModerationCard from '../components/ModerationCard';
 import CompanyEditor from '../components/CompanyEditor';
 import { Ad, Category, Company, Coupon } from '../types';
-import { adService, categoryService, companyService, couponService, settingsService } from '../services/mockFirebase';
+import { adService, categoryService, companyService, couponService, settingsService, notificationService, events } from '../services/mockFirebase';
 import toast from 'react-hot-toast';
 import ConfirmationModal from '../components/ConfirmationModal';
 
@@ -379,6 +379,14 @@ export default function Admin() {
     const loadId = toast.loading('Aprovando anúncio...');
     try {
       await adService.updateStatus(id, 'active');
+      const ad = ads.find(a => a.id === id);
+      if (ad) {
+        await notificationService.add(
+          'Anúncio Aprovado',
+          `Seu anúncio "${ad.title}" foi aprovado pelos administradores e já está ativo!`,
+          'approval'
+        );
+      }
       toast.success('Anúncio aprovado!', { id: loadId });
     } catch (err: any) {
       console.error(err);
@@ -393,6 +401,14 @@ export default function Admin() {
     const loadId = toast.loading('Rejeitando anúncio...');
     try {
       await adService.updateStatus(id, 'rejected');
+      const ad = ads.find(a => a.id === id);
+      if (ad) {
+        await notificationService.add(
+          'Anúncio Rejeitado',
+          `Infelizmente, seu anúncio "${ad.title}" não atende às nossas diretrizes e foi rejeitado.`,
+          'approval'
+        );
+      }
       toast.success('Anúncio rejeitado', { id: loadId });
     } catch (err: any) {
       console.error(err);
@@ -477,6 +493,14 @@ export default function Admin() {
     const loadId = toast.loading('Aprovando empresa...');
     try {
       await companyService.updateStatus(id, 'active');
+      const comp = allCompanies.find(c => c.id === id) || pendingCompanies.find(c => c.id === id);
+      if (comp) {
+        await notificationService.add(
+          'Empresa Aprovada',
+          `A empresa "${comp.name}" foi aprovada para anunciar na nossa plataforma!`,
+          'approval'
+        );
+      }
       setPendingCompanies(prev => prev.filter(c => c.id !== id));
       setAllCompanies(prev => prev.map(c => c.id === id ? { ...c, status: 'active', verified: true } : c));
       toast.success('Empresa aprovada!', { id: loadId });
@@ -493,6 +517,14 @@ export default function Admin() {
     const loadId = toast.loading('Rejeitando empresa...');
     try {
       await companyService.updateStatus(id, 'rejected');
+      const comp = allCompanies.find(c => c.id === id) || pendingCompanies.find(c => c.id === id);
+      if (comp) {
+        await notificationService.add(
+          'Parceria Rejeitada',
+          `Lamentamos, mas o registro da empresa "${comp.name}" não atende às nossas diretrizes e foi rejeitado.`,
+          'approval'
+        );
+      }
       setPendingCompanies(prev => prev.filter(c => c.id !== id));
       setAllCompanies(prev => prev.map(c => c.id === id ? { ...c, status: 'rejected' } : c));
       toast.success('Empresa rejeitada', { id: loadId });

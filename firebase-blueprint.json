@@ -1,0 +1,171 @@
+{
+  "entities": {
+    "Company": {
+      "title": "Company",
+      "description": "Dados cadastrais de uma empresa/anunciante local.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "name": { "type": "string" },
+        "description": { "type": "string" },
+        "logo": { "type": "string" },
+        "phone": { "type": "string" },
+        "whatsapp": { "type": "string" },
+        "instagram": { "type": "string" },
+        "website": { "type": "string" },
+        "address": { "type": "string" },
+        "hours": { "type": "string" },
+        "verified": { "type": "boolean" },
+        "status": { "type": "string", "enum": ["pending", "active", "rejected"] },
+        "category": { "type": "string" },
+        "cnpj": { "type": "string" },
+        "email": { "type": "string" },
+        "cep": { "type": "string" },
+        "street": { "type": "string" },
+        "number": { "type": "string" },
+        "complement": { "type": "string" },
+        "neighborhood": { "type": "string" },
+        "city": { "type": "string" },
+        "state": { "type": "string" }
+      },
+      "required": ["id", "name", "description", "phone", "whatsapp", "address"]
+    },
+    "Coupon": {
+      "title": "Coupon",
+      "description": "Cupons de desconto criados por empresas.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "companyId": { "type": "string" },
+        "code": { "type": "string" },
+        "description": { "type": "string" },
+        "discountValue": { "type": "string" },
+        "expiresAt": { "type": "string" },
+        "usageLimit": { "type": "number" },
+        "usedCount": { "type": "number" }
+      },
+      "required": ["id", "companyId", "code", "description", "discountValue", "expiresAt", "usedCount"]
+    },
+    "Ad": {
+      "title": "Ad",
+      "description": "Anúncio de vídeo curto de um produto ou serviço.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "companyId": { "type": "string" },
+        "companyName": { "type": "string" },
+        "companyLogo": { "type": "string" },
+        "title": { "type": "string" },
+        "videoUrl": { "type": "string" },
+        "thumbnail": { "type": "string" },
+        "category": { "type": "string" },
+        "city": { "type": "string" },
+        "price": { "type": "number" },
+        "installments": { "type": "string" },
+        "whatsappLink": { "type": "string" },
+        "location": { "type": "string" },
+        "cep": { "type": "string" },
+        "street": { "type": "string" },
+        "number": { "type": "string" },
+        "complement": { "type": "string" },
+        "neighborhood": { "type": "string" },
+        "state": { "type": "string" },
+        "expiresAt": { "type": "string" },
+        "likes": { "type": "number" },
+        "shares": { "type": "number" },
+        "saved": { "type": "number" },
+        "views": { "type": "number" },
+        "status": { "type": "string", "enum": ["pending", "active", "rejected"] },
+        "couponId": { "type": "string" },
+        "description": { "type": "string" },
+        "featured": { "type": "boolean" },
+        "createdAt": { "type": "number" }
+      },
+      "required": ["id", "companyId", "title", "videoUrl", "category", "city", "status", "createdAt"]
+    },
+    "UserSaved": {
+      "title": "UserSaved",
+      "description": "Anúncios salvos de um usuário.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "adIds": { "type": "array"}
+      },
+      "required": ["userId", "adIds"]
+    },
+    "UserCoupon": {
+      "title": "UserCoupon",
+      "description": "Cupom resgatado por um usuário.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "couponId": { "type": "string" },
+        "code": { "type": "string" },
+        "companyName": { "type": "string" },
+        "discountValue": { "type": "string" },
+        "expiresAt": { "type": "string" },
+        "redeemedAt": { "type": "number" }
+      },
+      "required": ["id", "userId", "couponId", "code", "companyName", "discountValue", "expiresAt", "redeemedAt"]
+    },
+    "AppNotification": {
+      "title": "AppNotification",
+      "description": "Notificações do sistema.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "message": { "type": "string" },
+        "createdAt": { "type": "number" },
+        "unread": { "type": "boolean" },
+        "type": { "type": "string", "enum": ["coupon", "approval", "chat"] }
+      },
+      "required": ["id", "title", "message", "createdAt", "unread", "type"]
+    },
+    "User": {
+      "title": "User",
+      "description": "Dados do perfil e nivel de permissão do usuário.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "email": { "type": "string" },
+        "displayName": { "type": "string" },
+        "role": { "type": "string", "enum": ["admin", "user"] },
+        "createdAt": { "type": "number" }
+      },
+      "required": ["uid", "email", "displayName", "role"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "Perfis de usuários de controle de acesso."
+    },
+    "/ads/{adId}": {
+      "schema": "Ad",
+      "description": "Armazena todos os anúncios Vapt."
+    },
+    "/companies/{companyId}": {
+      "schema": "Company",
+      "description": "Perfil de empresas cadastradas."
+    },
+    "/coupons/{couponId}": {
+      "schema": "Coupon",
+      "description": "Lista de cupons criados por lojistas."
+    },
+    "/notifications/{notificationId}": {
+      "schema": "AppNotification",
+      "description": "Notificações gerais de moderação e cupons."
+    },
+    "/userSaved/{userId}": {
+      "schema": "UserSaved",
+      "description": "Lista de IDs de anúncios que o usuário salvou."
+    },
+    "/userCoupons/{userCouponId}": {
+      "schema": "UserCoupon",
+      "description": "Histórico de cupons resgatados individuais."
+    }
+  }
+}

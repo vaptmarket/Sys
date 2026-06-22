@@ -2,5 +2,7 @@
   "name": "Remix: Vapt Market",
   "description": "Plataforma de anúncios em vídeo curto para produtos, serviços e empresas locais.",
   "requestFramePermissions": [],
-  "majorCapabilities": []
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
 }

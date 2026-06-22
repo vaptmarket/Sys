@@ -22,8 +22,7 @@ export default function AuthGate({ children, requireAdmin = false }: AuthGatePro
 
   if (!isAuthenticated) {
     // Redireciona para login ou mostra modal de login
-    // Por enquanto, apenas redireciona para a home ou uma landing de login
-    return <Navigate to="/" state={{ from: location }} replace />;
+    return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
   if (requireAdmin && user?.role !== 'admin') {

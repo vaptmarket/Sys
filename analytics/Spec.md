@@ -1,71 +1,42 @@
-# Especificações Técnicas (Spec) - Pendências Restantes de Finalização
-**Data de Geração:** 19 de Junho de 2026 às 21:24:24 (Horário de Brasília)
+# Especificações Técnicas (Spec) - Pendências de Finalização
+**Data de Geração:** 19 de Junho de 2026 às 22:27:48 (Horário de Brasília)
 
-Este documento especifica os comportamentos detalhados, os requisitos de interface e o gerenciamento de estados necessários para implementar e finalizar as pendências identificadas no relatório `/analytics/report.md`.
-
----
-
-## 1. Componente: Feed em Formato de Vídeo (`/src/components/AdVideo.tsx`)
-
-### 1.1. Objetivo
-Garantir que as informações dos cupons promocionais exibidos sobrepostos ao vídeo curto do feed sejam totalmente dinâmicas, eliminando importações de arrays estáticos residuais e associando cupons recém-criados em tempo real às publicações.
-
-### 1.2. Requisitos de Comportamento & UX
-1.  **Carga Reativa e Assíncrona do Cupom:**
-    *   Sempre que a propriedade `ad` mudar ou a propriedade `ad.couponId` estiver definida, o componente deve disparar uma consulta assíncrona ao emulador local através de `couponService.getById(ad.couponId)`.
-    *   Enquanto o carregamento está em progresso, o botão do overlay que aciona o modal do cupom deve exibir um estado neutro ou ocultar-se suavemente para evitar interações quebradas.
-2.  **Popup e Resgate Dinâmico:**
-    *   O botão do cupom do overlay e o modal interno devem renderizar exclusivamente os dados do cupom carregado assincronamente (`coupon.code`, `coupon.description`, `coupon.expiresAt`).
-    *   Se o cupom associado `ad.couponId` não existir no banco local de dados do emulador (por ter sido deletado ou não estar persistido), as triggers de cupom do overlay do anúncio devem ser completamente omitidas da visualização de forma elegante para o usuário.
-
-### 1.3. Especificação do Gerenciamento de Estado
-*   **Estado:** `coupon` do tipo `Coupon | null` (inicializado como `null`).
-*   **Hook (`useEffect`):**
-    *   Garantir o uso correto de variáveis de controle de concorrência (`let active = true`) no callback assíncrono para prevenir condições de corrida comuns em feeds de scroll rápido:
-        ```typescript
-        React.useEffect(() => {
-          let active = true;
-          if (ad.couponId) {
-            couponService.getById(ad.couponId).then(fetched => {
-              if (active) setCoupon(fetched || null);
-            }).catch(err => {
-              console.error(err);
-              if (active) setCoupon(null);
-            });
-          } else {
-            setCoupon(null);
-          }
-          return () => { active = false; };
-        }, [ad.couponId]);
-        ```
+Este documento descreve detalhadamente as especificações de comportamento de interface (UI/UX), fluxo de dados assíncronos e gerenciados de estado que faltam implementar no **Vapt Market**, baseando-se estritamente nas finalizações de rotas identificadas no arquivo `/analytics/report.md`.
 
 ---
 
-## 2. Componente: Layout Geral e Barra de Cabeçalho (`/src/components/Layout.tsx`)
+## 1. Componente: Feed Curto de Vídeo (`/src/components/AdVideo.tsx`)
 
-### 2.1. Objetivo
-Finalizar a integração de notificações reativas baseadas em barramento de eventos locais (`events`), integrando a moderação em tempo real à exibição visual de alertas no cabeçalho do layout principal.
+### 1.1. Propósito e Tela
+*   **Comportamento:** Elemento interativo sobreposto ao vídeo em loop no feed vertical secundário.
+*   **Ação de Finalização:** Substituição completa do consumo residual de dados estáticos pelo carregamento assíncrono indexado.
 
-### 2.2. Requisitos de Comportamento & UX
-1.  **Reatividade de Alertas do Sino:**
-    *   A central de notificações disposta no topo da barra de navegação no cabeçalho deve carregar as notificações salvas do usuário no armazenamento local e assinar alterações em tempo real via `events.subscribe('notifications_updated', ...)`.
-2.  **Aprovação & Rejeição no Painel Admin:**
-    *   Quando um administrador aprovar ou rejeitar um anúncio ou parceria empresarial na visão administrativa (`Admin.tsx`), os respectivos métodos `adService.updateStatus` e `companyService.updateStatus` persistirão o novo status e preencherão novas notificações dentro do serviço de emulação.
-    *   Essas novas notificações devem disparar o barramento de eventos reativos para atualizar o sino do usuário conectado ao cabeçalho instantaneamente (sem necessidade de recarga manual de página).
-3.  **Marcação de Leitura & Limpeza:**
-    *   O menu popover do sino deve expor uma ação para marcar todas as mensagens pendentes como lidas através de `notificationService.markAllAsRead()`.
-    *   Ao ler uma notificação ou ao usar o botão de ler tudo, o badge visual vermelho de novo conteúdo sobre o sino de navegação do usuário deve desaparecer em tempo real.
+### 1.2. Especificação de Comportamento & Requisitos de UX
+1.  **Carregamento de Cupom:**
+    *   Sempre que a prop `ad` for alterada ou um novo `ad.couponId` for definido, disparar chamada assíncrona ao emulador local através de `couponService.getById(ad.couponId)`.
+    *   Utilizar um estado reativo local `coupon` para gerenciar a informação (`Coupon | null`).
+    *   Exibir indicadores de esqueleto (skeleton/pulse) nos elementos de desconto enquanto o carregamento está pendente.
+    *   Se o identificador de cupom `ad.couponId` não existir no banco local físico (não retornado ou nulo), omitir elegantemente todos os botões e popups de cupom de desconto associados ao overlay de navegação.
+2.  **Tratamento de Concorrência de Corrida (Race Conditions):**
+    *   Considerando a natureza rápida do scroll vertical, a carga assíncrona deve incluir uma trava (`let active = true;`) no efeito reativo para descartar estados de requisições cujas views correspondentes já foram desmontadas da árvore de decisões do React.
 
-### 2.3. Especificação do Gerenciamento de Estado
-*   **Estado:** `notifications` do tipo `AppNotification[]` (inicializado como array vazio).
-*   **Hook (`useEffect`):**
-    *   O componente realiza a consulta de carga na montagem inicial e escuta mudanças no fluxo local:
-        ```typescript
-        React.useEffect(() => {
-          notificationService.getAll().then(setNotifications);
-          const unsubscribe = events.subscribe('notifications_updated', (updated: AppNotification[]) => {
-            setNotifications([...updated].sort((a, b) => b.createdAt - a.createdAt));
-          });
-          return () => { unsubscribe(); };
-        }, []);
-        ```
+---
+
+## 2. Componente: Menu Lateral e Layout de Alertas (`/src/components/Layout.tsx` & `/src/views/Admin.tsx`)
+
+### 2.1. Propósito e Interfaces
+*   **Comportamento:** Barra superior de ferramentas contendo o botão do sino com popover integrado para acompanhamento do status de negócios.
+*   **Ação de Finalização:** Sincronização em tempo real de notificações em resposta à moderação efetuada na aba Administrativa sem recargas inteiras de página.
+
+### 2.2. Especificação de Comportamento & Requisitos de UX
+1.  **Observabilidade de Notificações com Pub/Sub:**
+    *   O cabeçalho do `Layout.tsx` deve carregar as notificações salvas inicialmente com `notificationService.getAll()` e assinar atualizações contínuas de alteração em tempo real pelo canal `'notifications_updated'`.
+    *   O badge visual vermelho sobre o ícone do sino deve refletir exatamente o número de alertas que possuem a propriedade `unread === true`.
+2.  **Operações no Painel do Administrador (`Admin.tsx`):**
+    *   Sempre que um administrador aprovar ou rejeitar uma solicitação de publicação de anúncio (`handleApproveAd`/`handleRejectAd`) ou parceria (`handleApproveCompany`/`handleRejectCompany`), o sistema deve:
+        *   Disparar o salvamento persistente do status na coleção do banco.
+        *   Registrar uma nova atividade legível no `notificationService` com detalhes do status de aprovação.
+        *   Notificar por broadcast através de `events.emit('notifications_updated', ...)` para retroalimentar o sino em tempo de execução imediato.
+3.  **Controle de Leitura Visual por Parte do Usuário:**
+    *   O menu popover do sino de alertas deve disponibilizar uma opção funcional "Marcar todas como lidas" em português.
+    *   A ativação desta ação deve acionar o serviço para marcar os itens no armazenamento persistente e emitir um novo evento para atualizar o cabeçalho imediatamente, zerando o badge vermelho.

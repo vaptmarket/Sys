@@ -1,16 +1,14 @@
 # Issue 40: Central de Alertas e Notificações Dinâmicas (Layout.tsx)
-**Data de Geração:** 19 de Junho de 2026 às 21:24:24 (Horário de Brasília)
+**Data de Geração:** 19 de Junho de 2026 às 22:27:48 (Horário de Brasília)
 
-## Descrição de Requisitos de Implementação
-As notificações exibidas no topo do layout principal (`/src/components/Layout.tsx`) precisam de conexão completa e robusta ao emulador de dados transacionais, garantindo que as ações executadas no painel de moderação (`Admin.tsx`) atualizem os badges de alerta de aprovação ou rejeição de anúncios e parcerias em tempo real.
+## 1. Descrição dos Requisitos de Implementação
+A central de acompanhamento de status do usuário (sino de alertas no topo direito do `Layout.tsx`) necessita estar ativamente integrada por broadcast ao painel de gerenciamento administrativo (`Admin.tsx`), sincronizando de forma transparente as interações que acontecem em backstage sem obrigar o anunciante a efetuar atualizações (refresh) manuais de tela inteira.
 
-## Passos Detalhados de Especificação
-1.  **Refatoração do Estado no Cabeçalho:**
-    *   Substituir mocks estáticos no estado pelo consumo direto do `notificationService.getAll()`.
-2.  **Gerenciamento de Assinatura via Eventos Reativos:**
-    *   No hook `useEffect` de inicialização do `Layout.tsx`, registrar uma inscrição ao tópico `'notifications_updated'` via `events.subscribe`.
-    *   Desinscrever robustamente o listener de eventos na desmontagem do cabeçalho do layout para prevenir vazamentos de memória na SPA.
-3.  **Comunicação Bidirecional de Moderação administrativa (`Admin.tsx`):**
-    *   Garantir que as funções `handleApproveAd`, `handleRejectAd`, `handleApproveCompany` e `handleRejectCompany` ao atuarem no painel administrativo executem a lógica correspondente de atualização de status, adicionando e notificando o barramento reativo.
-4.  **Ações Interativas de Leitura pelo Usuário:**
-    *   No popover do sino, mapear a interação de leitura geral com `notificationService.markAllAsRead()`, atualizando o contador e limpando os badges visuais de conteúdo não lido.
+## 2. Passos Detalhados de Especificação
+*   **Controle e Carregamento Ativo via Observador:**
+    *   No hook de ciclo de vida principal de renderização do `Layout.tsx`, assinar o barramento local de eventos `'notifications_updated'` via `events.subscribe`.
+    *   Garantir o desligamento reativo (unsubscribe) no momento em que a navegação do layout desmontar.
+*   **Transmissões Ativas na Moderação Adm (`Admin.tsx`):**
+    *   Vincular as mutações manuais dos administradores ao aprovar/rejeitar anúncios e parcerias. Depois de atualizar no banco de dados local com `adService.updateStatus` ou `companyService.updateStatus`, registrar uma nova entrada de notificação associada em tempo real com `notificationService.create` e emitir o evento no barramento (`events.emit('notifications_updated')`).
+*   **Interações de Usuário (Marcar como Lido):**
+    *   Implementar suporte no dropdown popup das notificações para que, ao clicar no trigger "Marcar todas como lidas", acione o serviço local e force a atualização instantânea para retirar as bolinhas vermelhas indicadoras e re-renderizar o estado com fidelidade.

@@ -11,6 +11,7 @@ import Cupons from './views/Cupons';
 import Profile from './views/Profile';
 import QueroAnunciar from './views/QueroAnunciar';
 import Admin from './views/Admin';
+import Login from './views/Login';
 import { Toaster } from 'react-hot-toast';
 
 function App() {
@@ -43,6 +44,8 @@ function App() {
           <Route path="/anunciar" element={<QueroAnunciar />} />
           <Route path="/admin" element={<Admin />} />
           <Route path="/perfil" element={<Profile />} />
+          <Route path="/login" element={<Login initialMode="login" />} />
+          <Route path="/cadastro" element={<Login initialMode="signup" />} />
         </Routes>
       </Layout>
     </BrowserRouter>
