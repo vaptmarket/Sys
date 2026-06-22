@@ -26,7 +26,19 @@ service cloud.firestore {
       allow read, write: if true;
     }
 
+    match /userSaves/{userId} {
+      allow read, write: if true;
+    }
+
     match /userCoupons/{userCouponId} {
+      allow read, write: if true;
+    }
+
+    match /categories/{categoryId} {
+      allow read, write: if true;
+    }
+
+    match /settings/{settingsId} {
       allow read, write: if true;
     }
   }
