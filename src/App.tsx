@@ -1,5 +1,5 @@
 import React from 'react';
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { HashRouter, Routes, Route } from 'react-router-dom';
 import Layout from './components/Layout';
 import ScrollToTop from './components/ScrollToTop';
 import Feed from './views/Feed';
@@ -16,7 +16,7 @@ import { Toaster } from 'react-hot-toast';
 
 function App() {
   return (
-    <BrowserRouter>
+    <HashRouter>
       <Toaster 
         position="top-center" 
         toastOptions={{
@@ -48,7 +48,7 @@ function App() {
           <Route path="/cadastro" element={<Login initialMode="signup" />} />
         </Routes>
       </Layout>
-    </BrowserRouter>
+    </HashRouter>
   );
 }
 
