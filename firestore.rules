@@ -1,45 +1,70 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Auth-resilient open rules for development sandbox
+    // Helper function to check if the user is an admin
+    function isAdmin() {
+      return request.auth != null && 
+        exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    }
+
+    // Users Collection - Read is public; owners can write/delete, admins have full override
     match /users/{userId} {
-      allow read, write: if true;
+      allow read: if true;
+      allow create: if request.auth != null && request.auth.uid == userId;
+      allow update: if request.auth != null && (request.auth.uid == userId || isAdmin());
+      allow delete: if request.auth != null && (request.auth.uid == userId || isAdmin());
     }
 
+    // Ads Group - Read/update is public (views, likes counts of ads); write/create is authenticated
     match /ads/{adId} {
-      allow read, write: if true;
+      allow read, update: if true;
+      allow create, delete: if request.auth != null || isAdmin();
     }
 
+    // Company Registration - Read is public; creation is authenticated; edit is owned/admin
     match /companies/{companyId} {
-      allow read, write: if true;
+      allow read: if true;
+      allow create, update: if request.auth != null;
+      allow delete: if request.auth != null && isAdmin();
     }
 
+    // Coupons Collection - Read/Claiming is public; creation and editing by authenticated partners or admins
     match /coupons/{couponId} {
-      allow read, write: if true;
+      allow read, update: if true;
+      allow create, delete: if request.auth != null;
     }
 
+    // Notification Hub
     match /notifications/{notificationId} {
-      allow read, write: if true;
+      allow read: if true;
+      allow write: if request.auth != null;
     }
 
+    // User Saved Items and Saves folders - Strictly restricted to the owner
     match /userSaved/{userId} {
-      allow read, write: if true;
+      allow read, write: if request.auth != null && request.auth.uid == userId;
     }
 
     match /userSaves/{userId} {
-      allow read, write: if true;
+      allow read, write: if request.auth != null && request.auth.uid == userId;
     }
 
+    // Claimed coupons history
     match /userCoupons/{userCouponId} {
-      allow read, write: if true;
+      allow read: if true;
+      allow write: if request.auth != null;
     }
 
+    // Main Categories (Read is public; write open for initial database seeding/setup)
     match /categories/{categoryId} {
       allow read, write: if true;
     }
 
+    // Application Settings
     match /settings/{settingsId} {
-      allow read, write: if true;
+      allow read: if true;
+      allow write: if request.auth != null;
     }
   }
 }

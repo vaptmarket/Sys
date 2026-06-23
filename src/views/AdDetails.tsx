@@ -1,7 +1,7 @@
 import React from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { adService, companyService } from '../services/mockFirebase';
-import { Ad, Company } from '../types';
+import { adService, companyService, couponService } from '../services/mockFirebase';
+import { Ad, Company, Coupon } from '../types';
 import { 
   MessageCircle, 
   MapPin, 
@@ -13,13 +13,16 @@ import {
   Store,
   Clock,
   ShieldCheck,
-  Play
+  Play,
+  Ticket
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
 import L from 'leaflet';
 import { cn } from '../lib/utils';
 import ShareModal from '../components/ShareModal';
+import { useAuth } from '../hooks/useAuth';
+import { toast } from 'react-hot-toast';
 
 // Fix for Leaflet icon
 const DefaultIcon = L.icon({
@@ -35,15 +38,34 @@ L.Marker.prototype.options.icon = DefaultIcon;
 
 export default function AdDetails() {
   const { id } = useParams();
+  const { user } = useAuth();
+  
   const [ad, setAd] = React.useState<Ad | null>(null);
   const [company, setCompany] = React.useState<Company | null>(null);
   const [relatedAds, setRelatedAds] = React.useState<Ad[]>([]);
+  const [coupons, setCoupons] = React.useState<Coupon[]>([]);
+  const [redeemedIds, setRedeemedIds] = React.useState<string[]>([]);
+  
   const [isLoading, setIsLoading] = React.useState(true);
-
-  const [selectedImage, setSelectedImage] = React.useState(0);
+  const [isRedeeming, setIsRedeeming] = React.useState<string | null>(null);
   const [isLiked, setIsLiked] = React.useState(false);
+  const [isSaved, setIsSaved] = React.useState(false);
   const [showShareModal, setShowShareModal] = React.useState(false);
+  const [activeLightboxIndex, setActiveLightboxIndex] = React.useState<number | null>(null);
 
+  // Sync like status from localStorage
+  React.useEffect(() => {
+    try {
+      const likedAds = JSON.parse(localStorage.getItem('vapt_liked_ads') || '[]');
+      if (id && likedAds.includes(id)) {
+        setIsLiked(true);
+      }
+    } catch {
+      // Ignore fallback
+    }
+  }, [id]);
+
+  // Main ad data fetching
   React.useEffect(() => {
     let active = true;
     async function loadData() {
@@ -70,6 +92,17 @@ export default function AdDetails() {
             .filter(a => a.id !== id && a.category === foundAd.category && a.status === 'active')
             .slice(0, 3);
           setRelatedAds(related);
+
+          // Get coupons of this company
+          try {
+            const allCoupons = await couponService.getAll();
+            const filteredCoupons = allCoupons.filter(c => c.companyId === foundAd.companyId);
+            if (active) {
+              setCoupons(filteredCoupons);
+            }
+          } catch (err) {
+            console.warn("Nenhum cupom carregado para este parceiro", err);
+          }
         } else {
           setAd(null);
           setCompany(null);
@@ -87,6 +120,113 @@ export default function AdDetails() {
       active = false;
     };
   }, [id]);
+
+  // Fetch Saved and Redeemed Statuses when user is logged in
+  React.useEffect(() => {
+    if (!user || !ad) {
+      setRedeemedIds([]);
+      setIsSaved(false);
+      return;
+    }
+
+    let active = true;
+    async function fetchUserStates() {
+      try {
+        const isSavedFirebase = await adService.isAdSaved(user.uid, ad.id);
+        if (!active) return;
+        setIsSaved(isSavedFirebase);
+
+        const userCoupons = await couponService.getUserCoupons(user.uid);
+        if (!active) return;
+        setRedeemedIds(userCoupons.map(uc => uc.couponId));
+      } catch (err) {
+        console.error("Erro ao carregar estados de usuário:", err);
+      }
+    }
+
+    fetchUserStates();
+    return () => {
+      active = false;
+    };
+  }, [user, ad]);
+
+  const handleToggleLike = async () => {
+    if (!ad) return;
+    try {
+      const nextLiked = !isLiked;
+      setIsLiked(nextLiked);
+      
+      // Update local storage
+      const likedAds = JSON.parse(localStorage.getItem('vapt_liked_ads') || '[]');
+      if (nextLiked) {
+        if (!likedAds.includes(ad.id)) {
+          likedAds.push(ad.id);
+        }
+      } else {
+        const idx = likedAds.indexOf(ad.id);
+        if (idx > -1) {
+          likedAds.splice(idx, 1);
+        }
+      }
+      localStorage.setItem('vapt_liked_ads', JSON.stringify(likedAds));
+
+      // Update in Firebase / Local Counter
+      await adService.updateLikes(ad.id, nextLiked ? 1 : -1);
+      setAd(prev => prev ? { ...prev, likes: Math.max(0, prev.likes + (nextLiked ? 1 : -1)) } : null);
+      
+      if (nextLiked) {
+        toast.success("Obrigado pelo feedback! Você curtiu o anúncio.", { icon: '❤️' });
+      } else {
+        toast("Curtida removida com sucesso.", { icon: '💔' });
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const handleToggleSave = async () => {
+    if (!ad) return;
+    if (!user) {
+      toast.error("Por favor, faça login para salvar anúncios nos seus favoritos.");
+      return;
+    }
+    
+    try {
+      const saved = await adService.toggleSave(user.uid, ad.id);
+      setIsSaved(saved);
+      if (saved) {
+        toast.success("Anúncio salvo nos favoritos! Acesse-o no seu perfil.", { icon: '⭐' });
+      } else {
+        toast("Anúncio removido dos favoritos.", { icon: '🗑️' });
+      }
+    } catch (err) {
+      console.error(err);
+      toast.error("Erro ao atualizar favoritos.");
+    }
+  };
+
+  const handleRedeem = async (coupon: Coupon) => {
+    if (!user) {
+      toast.error("Por favor, faça login ou crie uma conta para resgatar cupons.");
+      return;
+    }
+
+    setIsRedeeming(coupon.id);
+    try {
+      const redeemed = await couponService.redeem(user.uid, coupon.id);
+      if (redeemed) {
+        setRedeemedIds(prev => [...prev, coupon.id]);
+        toast.success(`Cupom ${coupon.code} resgatado! Veja no seu perfil.`, { icon: '🎫' });
+      } else {
+        toast.error("Erro ao resgatar cupom. Tente novamente.");
+      }
+    } catch (err) {
+      console.error(err);
+      toast.error("Falha ao se conectar. Tente novamente.");
+    } finally {
+      setIsRedeeming(null);
+    }
+  };
 
   if (isLoading) {
     return (
@@ -142,21 +282,39 @@ export default function AdDetails() {
       <div className="flex items-center justify-between mb-6 md:mb-8">
         <Link to="/busca" className="flex items-center gap-2 text-white/40 hover:text-white transition-colors group">
           <ChevronLeft size={18} className="group-hover:-translate-x-1 transition-transform" />
-          <span className="text-[10px] md:text-xs font-black uppercase tracking-widest">Voltar</span>
+          <span className="text-[10px] md:text-xs font-black uppercase tracking-widest">Voltar para a busca</span>
         </Link>
-        <div className="flex items-center gap-3 md:gap-4">
+        <div className="flex items-center gap-2 md:gap-3">
           <button 
             onClick={() => setShowShareModal(true)}
-            className="w-9 h-9 md:w-10 md:h-10 rounded-full bg-white/5 flex items-center justify-center text-white hover:bg-white/10 transition-all"
+            className="w-9 h-9 md:w-10 md:h-10 rounded-full bg-white/5 flex items-center justify-center text-white hover:bg-white/10 transition-all border border-white/5 hover:border-white/10"
+            title="Compartilhar"
           >
             <Share2 size={16} md:size={18} />
           </button>
+          
           <button 
-            onClick={() => setIsLiked(!isLiked)}
+            onClick={handleToggleSave}
             className={cn(
-              "w-9 h-9 md:w-10 md:h-10 rounded-full flex items-center justify-center transition-all",
-              isLiked ? "bg-brand-orange text-white" : "bg-white/5 text-white hover:bg-white/10"
+              "w-9 h-9 md:w-10 md:h-10 rounded-full flex items-center justify-center transition-all border",
+              isSaved 
+                ? "bg-brand-blue text-white border-brand-blue shadow-lg shadow-brand-blue/10" 
+                : "bg-white/5 text-white border-white/5 hover:bg-white/10 hover:border-white/10"
             )}
+            title={isSaved ? "Salvo nos favoritos" : "Salvar nos favoritos"}
+          >
+            <Bookmark size={16} md:size={18} fill={isSaved ? "currentColor" : "none"} />
+          </button>
+
+          <button 
+            onClick={handleToggleLike}
+            className={cn(
+              "w-9 h-9 md:w-10 md:h-10 rounded-full flex items-center justify-center transition-all border",
+              isLiked 
+                ? "bg-brand-orange text-white border-brand-orange shadow-lg shadow-brand-orange/10" 
+                : "bg-white/5 text-white border-white/5 hover:bg-white/10 hover:border-white/10"
+            )}
+            title={isLiked ? "Curtido" : "Curtir"}
           >
             <Heart size={16} md:size={18} fill={isLiked ? "currentColor" : "none"} />
           </button>
@@ -176,12 +334,12 @@ export default function AdDetails() {
             />
             <div className="absolute top-4 left-4 md:top-6 md:left-6 pointer-events-none">
               <span className="bg-brand-blue/80 backdrop-blur-md text-[8px] md:text-[10px] font-black px-2 py-1 md:px-3 md:py-1.5 rounded-lg uppercase tracking-widest text-white shadow-xl">
-                 Vídeo em Destaque
+                 Vídeo Comercial Oficial
               </span>
             </div>
           </div>
 
-          {/* Description & Gallery */}
+          {/* Description, Gallery & Coupons */}
           <div className="space-y-6 md:space-y-8 bg-surface-panel p-5 md:p-12 rounded-2xl md:rounded-[2.5rem] border border-white/10">
             <div>
                <div className="flex items-center gap-2 mb-4">
@@ -189,48 +347,113 @@ export default function AdDetails() {
                     {ad.category}
                   </span>
                   <span className="text-white/20 text-[9px] md:text-[10px] font-black uppercase tracking-widest flex items-center gap-1">
-                    <Clock size={10} md:size={12} /> Postado há 2 dias
+                    <Clock size={10} md:size={12} /> Postado recentemente
                   </span>
                </div>
                <h1 className="text-2xl md:text-5xl font-black font-display text-white italic uppercase tracking-tighter leading-tight md:leading-none mb-4 md:mb-6">
                  {ad.title}
                </h1>
-               <div className="flex items-center gap-6 pb-6 md:pb-8 border-b border-white/5">
+               <div className="flex items-center justify-between pb-6 md:pb-8 border-b border-white/5 flex-wrap gap-4">
                   <div className="flex items-baseline gap-2">
-                    <span className="text-xl md:text-3xl font-black text-brand-green tracking-tighter">
+                    <span className="text-xl md:text-4xl font-black text-brand-green tracking-tighter">
                       {ad.price ? `R$ ${ad.price.toLocaleString('pt-BR')}` : 'Sob Consulta'}
                     </span>
                     {ad.installments && (
                       <span className="text-white/30 text-[9px] md:text-xs font-bold uppercase">{ad.installments}</span>
                     )}
                   </div>
+                  
+                  {ad.likes > 0 && (
+                    <div className="flex items-center gap-1 text-white/30 text-xs font-bold uppercase tracking-widest bg-white/[0.02] border border-white/5 px-3 py-1.5 rounded-lg">
+                      <Heart size={12} fill="currentColor" className="text-brand-orange" /> {ad.likes} {ad.likes === 1 ? 'Curtida' : 'Curtidas'}
+                    </div>
+                  )}
                </div>
             </div>
 
-            <div className="space-y-4 md:space-y-6">
-               <h3 className="text-base md:text-lg font-bold text-white uppercase tracking-tight flex items-center gap-2">
+            <div className="space-y-4">
+               <h3 className="text-base md:text-lg font-black text-white uppercase tracking-tight">
                  Sobre este Anúncio
                </h3>
-               <p className="text-white/60 leading-relaxed text-sm md:text-lg font-medium">
+               <p className="text-white/60 leading-relaxed text-sm md:text-base font-medium whitespace-pre-line">
                  {ad.description || 'Nenhuma descrição detalhada fornecida para este anúncio.'}
                </p>
             </div>
 
             {/* Gallery */}
-            <div className="space-y-4">
-               <h3 className="text-sm md:text-lg font-bold text-white uppercase tracking-tight">Fotos Reais</h3>
+            <div className="space-y-4 pt-6 border-t border-white/5">
+               <h3 className="text-sm md:text-base font-black text-white uppercase tracking-tight">Fotos Reais</h3>
                <div className="grid grid-cols-2 md:grid-cols-3 gap-3 md:gap-4">
                  {galleryImages.map((img, idx) => (
                    <motion.div 
                      key={idx}
                      whileHover={{ scale: 1.05 }}
-                     className="aspect-square rounded-lg md:rounded-2xl overflow-hidden border border-white/10 cursor-pointer"
+                     onClick={() => setActiveLightboxIndex(idx)}
+                     className="aspect-square rounded-xl md:rounded-2xl overflow-hidden border border-white/10 cursor-pointer bg-black/40 relative group"
                    >
-                     <img src={img} alt={`Gallery ${idx}`} className="w-full h-full object-cover" />
+                     <img src={img} alt={`Gallery ${idx}`} className="w-full h-full object-cover transition-opacity duration-300 group-hover:opacity-90" />
+                     <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-end justify-center p-3">
+                       <span className="text-[8px] font-black uppercase tracking-widest text-white bg-black/60 px-2 py-1 rounded">Ampliar Foto</span>
+                     </div>
                    </motion.div>
                  ))}
                </div>
             </div>
+
+            {/* Coupons Section */}
+            {coupons.length > 0 && (
+              <div className="space-y-4 md:space-y-6 pt-6 border-t border-white/10">
+                <h3 className="text-base md:text-lg font-black text-white uppercase tracking-tight flex items-center gap-2">
+                  <Ticket className="text-brand-orange" size={18} /> Cupons de Desconto Parceiros
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {coupons.map((coupon) => {
+                    const isRedeemed = redeemedIds.includes(coupon.id);
+                    return (
+                      <motion.div
+                        key={coupon.id}
+                        whileHover={{ y: -2 }}
+                        className={cn(
+                          "relative p-4 rounded-xl border flex flex-col justify-between transition-all overflow-hidden",
+                          isRedeemed 
+                            ? "bg-white/[0.01] border-white/5 opacity-70" 
+                            : "bg-surface-item border-white/10 hover:border-brand-orange/30"
+                        )}
+                      >
+                        <div className="absolute top-0 right-0 w-16 h-16 bg-brand-orange/5 rounded-full -mr-6 -mt-6 blur-md pointer-events-none" />
+                        <div>
+                          <div className="flex items-center justify-between gap-2 mb-2">
+                            <span className="text-xs font-black text-brand-orange uppercase bg-brand-orange/10 px-2.5 py-0.5 rounded">
+                              {coupon.discountValue} Off
+                            </span>
+                            <span className="text-[9px] font-bold text-white/40 uppercase">
+                              Expira em: {new Date(coupon.expiresAt).toLocaleDateString('pt-BR')}
+                            </span>
+                          </div>
+                          <h4 className="text-sm font-black text-white italic uppercase mb-1">{coupon.code}</h4>
+                          <p className="text-xs text-white/50 leading-snug line-clamp-2 mb-4">
+                            {coupon.description}
+                          </p>
+                        </div>
+                        <button
+                          disabled={isRedeemed || isRedeeming === coupon.id}
+                          onClick={() => handleRedeem(coupon)}
+                          className={cn(
+                            "w-full py-2.5 text-[10px] font-black uppercase tracking-widest rounded-lg transition-all flex items-center justify-center gap-2",
+                            isRedeemed
+                              ? "bg-white/5 text-white/30 cursor-not-allowed border border-white/5"
+                              : "bg-brand-orange hover:bg-brand-orange/90 text-white shadow-lg shadow-brand-orange/10 active:scale-[0.98]"
+                          )}
+                        >
+                          <Ticket size={12} />
+                          {isRedeemed ? "Resgatado" : isRedeeming === coupon.id ? "Resgatando..." : "Resgatar Cupom"}
+                        </button>
+                      </motion.div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Location Map Section */}
@@ -258,12 +481,12 @@ export default function AdDetails() {
                   />
                   <Marker position={[ad.coords.lat, ad.coords.lng]}>
                     <Popup>
-                      <div className="p-2 font-bold">{ad.companyName}</div>
+                      <div className="p-2 font-bold text-gray-900">{ad.companyName}</div>
                     </Popup>
                   </Marker>
                 </MapContainer>
                ) : (
-                 <div className="w-full h-full bg-white/5 flex items-center justify-center text-white/20 italic">Mapa não disponível</div>
+                  <div className="w-full h-full bg-white/5 flex items-center justify-center text-white/20 italic">Mapa não disponível</div>
                )}
             </div>
           </div>
@@ -340,6 +563,75 @@ export default function AdDetails() {
         </div>
       </div>
       
+      {/* Photo Lightbox Modal */}
+      <AnimatePresence>
+        {activeLightboxIndex !== null && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/95 z-50 flex items-center justify-center p-4 backdrop-blur-md"
+            onClick={() => setActiveLightboxIndex(null)}
+          >
+            {/* Close Button */}
+            <button
+              onClick={() => setActiveLightboxIndex(null)}
+              className="absolute top-6 right-6 text-white/50 hover:text-white bg-white/10 hover:bg-white/20 p-3 rounded-full transition-all"
+            >
+              <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+
+            {/* Navigation Arrows */}
+            {galleryImages.length > 1 && (
+              <>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setActiveLightboxIndex(prev => prev !== null ? (prev - 1 + galleryImages.length) % galleryImages.length : null);
+                  }}
+                  className="absolute left-6 top-1/2 -translate-y-1/2 text-white/50 hover:text-white bg-white/10 hover:bg-white/20 p-4 rounded-full transition-all flex items-center justify-center"
+                >
+                  <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                  </svg>
+                </button>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setActiveLightboxIndex(prev => prev !== null ? (prev + 1) % galleryImages.length : null);
+                  }}
+                  className="absolute right-6 top-1/2 -translate-y-1/2 text-white/50 hover:text-white bg-white/10 hover:bg-white/20 p-4 rounded-full transition-all flex items-center justify-center"
+                >
+                  <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                  </svg>
+                </button>
+              </>
+            )}
+
+            {/* Image Container */}
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="relative max-w-4xl max-h-[80vh] flex flex-col items-center"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <img
+                src={galleryImages[activeLightboxIndex]}
+                alt="Detalhe da Foto"
+                className="w-full h-full max-h-[75vh] object-contain rounded-2xl border border-white/10 shadow-2xl"
+              />
+              <p className="text-white/40 text-[9px] font-black uppercase tracking-widest mt-4">
+                Foto {activeLightboxIndex + 1} de {galleryImages.length}
+              </p>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       <ShareModal 
         isOpen={showShareModal} 
         onClose={() => setShowShareModal(false)} 

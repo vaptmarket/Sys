@@ -22,6 +22,7 @@ export default function Login({ initialMode = 'login' }: LoginProps) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [agreeTerms, setAgreeTerms] = useState(false);
   
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -76,6 +77,10 @@ export default function Login({ initialMode = 'login' }: LoginProps) {
       }
       if (password !== confirmPassword) {
         toast.error('As senhas digitadas não coincidem.');
+        return;
+      }
+      if (!agreeTerms) {
+        toast.error('Você precisa aceitar as Regras de Uso para continuar.');
         return;
       }
     }
@@ -260,6 +265,22 @@ export default function Login({ initialMode = 'login' }: LoginProps) {
                     className="block w-full pl-11 pr-4 py-3.5 bg-white/[0.03] border border-white/10 rounded-2xl text-white placeholder-white/20 font-medium text-sm focus:outline-none focus:border-brand-orange focus:ring-1 focus:ring-brand-orange transition-all"
                   />
                 </div>
+              </div>
+            )}
+
+            {mode === 'signup' && (
+              <div className="flex items-start space-x-2 pt-2 px-1">
+                <input
+                  id="agreeTerms"
+                  type="checkbox"
+                  checked={agreeTerms}
+                  onChange={(e) => setAgreeTerms(e.target.checked)}
+                  required
+                  className="mt-0.5 h-4 w-4 rounded border-white/10 bg-white/[0.03] text-brand-orange focus:ring-brand-orange focus:ring-offset-0 transition-colors cursor-pointer"
+                />
+                <label htmlFor="agreeTerms" className="text-[10px] text-white/40 font-medium select-none cursor-pointer leading-tight">
+                  Eu concordo com as <span className="text-brand-orange font-bold hover:underline cursor-pointer" onClick={(e) => { e.preventDefault(); toast('Regras de Usuário: Seu perfil e dados pessoais são protegidos pela LGPD. Não é permitido criar anúncios ofensivos, de ódio ou enganosos. Todas as campanhas passam por moderação.', { duration: 7000, icon: '🛡️' }); }}>Regras de Uso</span> e políticas de login e cadastro.
+                </label>
               </div>
             )}
           </div>
