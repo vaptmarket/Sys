@@ -27,7 +27,8 @@ import {
   MessageSquare,
   Globe,
   Instagram,
-  Clock
+  Clock,
+  QrCode
 } from 'lucide-react';
 import { adService, couponService, companyService, categoryService, events } from '../services/mockFirebase';
 import { Ad, UserCoupon, Company } from '../types';
@@ -38,6 +39,7 @@ import { Helmet } from 'react-helmet-async';
 import toast from 'react-hot-toast';
 
 import { Navigate } from 'react-router-dom';
+import QrCodeModal from '../components/QrCodeModal';
 
 export default function Profile() {
   const { user, isAuthenticated, loading, login, logout, updateProfile } = useAuth();
@@ -50,6 +52,12 @@ export default function Profile() {
   const [companyAds, setCompanyAds] = React.useState<Ad[]>([]);
   const [viewHistory, setViewHistory] = React.useState<Ad[]>([]);
   const [availableCats, setAvailableCats] = React.useState<any[]>([]);
+  const [selectedCoupon, setSelectedCoupon] = React.useState<{
+    code: string;
+    discountValue: string;
+    description: string;
+    companyName: string;
+  } | null>(null);
 
   const [compName, setCompName] = React.useState('');
   const [compCategory, setCompCategory] = React.useState('');
@@ -575,9 +583,22 @@ export default function Profile() {
                       Expira em: {new Date(coupon.expiresAt).toLocaleDateString()}
                     </p>
                   </div>
-                  <div className="bg-white/5 px-6 py-4 rounded-2xl border-2 border-dashed border-white/10 flex flex-col items-center shrink-0 min-w-[150px]">
-                    <span className="text-[9px] font-black text-white/25 uppercase tracking-widest mb-1.5">Cupom Ativo</span>
-                    <span className="text-lg font-black text-brand-blue font-mono tracking-widest bg-brand-blue/5 border border-brand-blue/20 px-3 py-1 rounded-lg">{coupon.code}</span>
+                  <div className="bg-white/5 px-6 py-4 rounded-2xl border-2 border-dashed border-white/10 flex flex-col items-center shrink-0 min-w-[150px] gap-2">
+                    <div className="text-center">
+                      <span className="text-[9px] font-black text-white/25 uppercase tracking-widest mb-1 block">Cupom Ativo</span>
+                      <span className="text-lg font-black text-brand-blue font-mono tracking-widest bg-brand-blue/5 border border-brand-blue/20 px-3 py-1 rounded-lg block">{coupon.code}</span>
+                    </div>
+                    <button
+                      onClick={() => setSelectedCoupon({
+                        code: coupon.code,
+                        discountValue: coupon.discountValue,
+                        description: coupon.description || 'Cupom Promocional',
+                        companyName: coupon.companyName
+                      })}
+                      className="w-full py-1.5 rounded-lg bg-brand-orange text-white text-[10px] font-black uppercase tracking-wider flex items-center justify-center gap-1 hover:scale-105 active:scale-95 transition-all cursor-pointer"
+                    >
+                      <QrCode size={12} /> QR Code
+                    </button>
                   </div>
                 </motion.div>
               )) : (
@@ -1380,6 +1401,15 @@ export default function Profile() {
           </div>
         </div>
       )}
+
+      <QrCodeModal 
+        isOpen={selectedCoupon !== null}
+        onClose={() => setSelectedCoupon(null)}
+        code={selectedCoupon?.code || ''}
+        discountValue={selectedCoupon?.discountValue || ''}
+        description={selectedCoupon?.description || ''}
+        companyName={selectedCoupon?.companyName || ''}
+      />
     </div>
   );
 }

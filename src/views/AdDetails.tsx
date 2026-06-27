@@ -14,13 +14,15 @@ import {
   Clock,
   ShieldCheck,
   Play,
-  Ticket
+  Ticket,
+  QrCode
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
 import L from 'leaflet';
 import { cn } from '../lib/utils';
 import ShareModal from '../components/ShareModal';
+import QrCodeModal from '../components/QrCodeModal';
 import { useAuth } from '../hooks/useAuth';
 import { toast } from 'react-hot-toast';
 
@@ -52,6 +54,12 @@ export default function AdDetails() {
   const [isSaved, setIsSaved] = React.useState(false);
   const [showShareModal, setShowShareModal] = React.useState(false);
   const [activeLightboxIndex, setActiveLightboxIndex] = React.useState<number | null>(null);
+  const [selectedCoupon, setSelectedCoupon] = React.useState<{
+    code: string;
+    discountValue: string;
+    description: string;
+    companyName: string;
+  } | null>(null);
 
   // Sync like status from localStorage
   React.useEffect(() => {
@@ -435,19 +443,34 @@ export default function AdDetails() {
                             {coupon.description}
                           </p>
                         </div>
-                        <button
-                          disabled={isRedeemed || isRedeeming === coupon.id}
-                          onClick={() => handleRedeem(coupon)}
-                          className={cn(
-                            "w-full py-2.5 text-[10px] font-black uppercase tracking-widest rounded-lg transition-all flex items-center justify-center gap-2",
-                            isRedeemed
-                              ? "bg-white/5 text-white/30 cursor-not-allowed border border-white/5"
-                              : "bg-brand-orange hover:bg-brand-orange/90 text-white shadow-lg shadow-brand-orange/10 active:scale-[0.98]"
-                          )}
-                        >
-                          <Ticket size={12} />
-                          {isRedeemed ? "Resgatado" : isRedeeming === coupon.id ? "Resgatando..." : "Resgatar Cupom"}
-                        </button>
+                        <div className="flex gap-2">
+                          <button
+                            disabled={isRedeemed || isRedeeming === coupon.id}
+                            onClick={() => handleRedeem(coupon)}
+                            className={cn(
+                              "flex-1 py-2.5 text-[10px] font-black uppercase tracking-widest rounded-lg transition-all flex items-center justify-center gap-2 cursor-pointer",
+                              isRedeemed
+                                ? "bg-white/5 text-white/30 cursor-not-allowed border border-white/5"
+                                : "bg-brand-orange hover:bg-brand-orange/90 text-white shadow-lg shadow-brand-orange/10 active:scale-[0.98]"
+                            )}
+                          >
+                            <Ticket size={12} />
+                            {isRedeemed ? "Resgatado" : isRedeeming === coupon.id ? "Resgatando..." : "Resgatar Cupom"}
+                          </button>
+                          
+                          <button
+                            onClick={() => setSelectedCoupon({
+                              code: coupon.code,
+                              discountValue: coupon.discountValue,
+                              description: coupon.description,
+                              companyName: ad?.companyName || 'Parceiro'
+                            })}
+                            className="px-3.5 bg-white/5 hover:bg-white/10 text-white hover:text-brand-orange rounded-lg border border-white/10 flex items-center justify-center transition-all cursor-pointer"
+                            title="Visualizar QR Code"
+                          >
+                            <QrCode size={14} />
+                          </button>
+                        </div>
                       </motion.div>
                     );
                   })}
@@ -637,6 +660,15 @@ export default function AdDetails() {
         onClose={() => setShowShareModal(false)} 
         adTitle={ad.title} 
         adId={ad.id} 
+      />
+
+      <QrCodeModal 
+        isOpen={selectedCoupon !== null}
+        onClose={() => setSelectedCoupon(null)}
+        code={selectedCoupon?.code || ''}
+        discountValue={selectedCoupon?.discountValue || ''}
+        description={selectedCoupon?.description || ''}
+        companyName={selectedCoupon?.companyName || ''}
       />
     </div>
   );

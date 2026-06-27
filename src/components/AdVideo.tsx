@@ -12,7 +12,8 @@ import {
   Copy,
   Check,
   Tag,
-  X
+  X,
+  QrCode
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Ad, Coupon } from '../types';
@@ -20,6 +21,7 @@ import { cn } from '../lib/utils';
 import { Link } from 'react-router-dom';
 
 import ShareModal from './ShareModal';
+import QrCodeModal from './QrCodeModal';
 
 import { adService, couponService } from '../services/mockFirebase';
 import { useAuth } from '../hooks/useAuth';
@@ -28,13 +30,15 @@ import toast from 'react-hot-toast';
 interface AdVideoProps {
   ad: Ad;
   isActive: boolean;
+  isOldest?: boolean;
 }
 
-export default function AdVideo({ ad, isActive }: AdVideoProps) {
+export default function AdVideo({ ad, isActive, isOldest }: AdVideoProps) {
   const { user } = useAuth();
   const [isLiked, setIsLiked] = React.useState(false);
   const [isSaved, setIsSaved] = React.useState(false);
   const [showCouponModal, setShowCouponModal] = React.useState(false);
+  const [showQrCodeModal, setShowQrCodeModal] = React.useState(false);
   const [showShareModal, setShowShareModal] = React.useState(false);
   const [copied, setCopied] = React.useState(false);
   const [hasRedeemed, setHasRedeemed] = React.useState(false);
@@ -241,33 +245,43 @@ export default function AdVideo({ ad, isActive }: AdVideoProps) {
                     {coupon.code}
                   </p>
                   
-                  <button 
-                    onClick={handleRedeemCoupon}
-                    disabled={hasRedeemed && !copied}
-                    className={cn(
-                      "mt-4 w-full flex items-center justify-center gap-2 py-3 rounded-xl font-bold transition-all",
-                      hasRedeemed 
-                        ? "bg-brand-green/20 text-brand-green border border-brand-green/30" 
-                        : "bg-brand-blue hover:bg-brand-blue/90 text-white"
-                    )}
-                  >
-                    {copied ? (
-                      <>
-                        <Check size={18} />
-                        Copiado!
-                      </>
-                    ) : hasRedeemed ? (
-                      <>
-                        <Copy size={18} />
-                        Copiar Novamente
-                      </>
-                    ) : (
-                      <>
-                        <Copy size={18} />
-                        Copiar Código
-                      </>
-                    )}
-                  </button>
+                  <div className="grid grid-cols-2 gap-2 mt-4">
+                    <button 
+                      onClick={handleRedeemCoupon}
+                      disabled={hasRedeemed && !copied}
+                      className={cn(
+                        "flex items-center justify-center gap-1.5 py-3 rounded-xl font-bold transition-all text-xs cursor-pointer",
+                        hasRedeemed 
+                          ? "bg-brand-green/20 text-brand-green border border-brand-green/30" 
+                          : "bg-brand-blue hover:bg-brand-blue/90 text-white"
+                      )}
+                    >
+                      {copied ? (
+                        <>
+                          <Check size={14} />
+                          Copiado!
+                        </>
+                      ) : hasRedeemed ? (
+                        <>
+                          <Copy size={14} />
+                          Copiar
+                        </>
+                      ) : (
+                        <>
+                          <Copy size={14} />
+                          Resgatar
+                        </>
+                      )}
+                    </button>
+                    
+                    <button
+                      onClick={() => setShowQrCodeModal(true)}
+                      className="flex items-center justify-center gap-1.5 py-3 rounded-xl font-bold bg-white/5 hover:bg-white/10 text-white border border-white/10 transition-all text-xs cursor-pointer"
+                    >
+                      <QrCode size={14} />
+                      QR Code
+                    </button>
+                  </div>
                 </div>
 
                 <div className="flex items-center justify-center gap-2 text-[10px] font-bold text-white/30 uppercase tracking-widest">
@@ -290,7 +304,11 @@ export default function AdVideo({ ad, isActive }: AdVideoProps) {
       {/* Bottom Content */}
       <div className="absolute bottom-0 left-0 w-full p-4 md:p-8 flex flex-col gap-3 md:gap-4 z-10">
         <div className="mb-1 md:mb-2">
-           <span className="bg-brand-blue text-[8px] md:text-[9px] font-black px-2 py-0.5 md:py-1 rounded-sm uppercase mb-1 md:mb-2 inline-block tracking-widest text-white">Anúncio Premium</span>
+           {isOldest && (
+             <span className="bg-brand-blue text-[8px] md:text-[9px] font-black px-2 py-0.5 md:py-1 rounded-sm uppercase mb-1 md:mb-2 inline-block tracking-widest text-white">
+               Postagem Mais Antiga
+             </span>
+           )}
            <h2 className="text-xl md:text-2xl font-bold text-white tracking-tight leading-tight line-clamp-2">
              {ad.title}
            </h2>
@@ -341,6 +359,17 @@ export default function AdVideo({ ad, isActive }: AdVideoProps) {
           </Link>
         </div>
       </div>
+
+      {coupon && (
+        <QrCodeModal 
+          isOpen={showQrCodeModal}
+          onClose={() => setShowQrCodeModal(false)}
+          code={coupon.code}
+          discountValue={coupon.discountValue}
+          description={coupon.description}
+          companyName={ad.companyName}
+        />
+      )}
     </div>
   );
 }

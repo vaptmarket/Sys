@@ -31,13 +31,24 @@ export default function Feed() {
     return ad.createdAt || 0;
   };
 
+  const oldestAdId = React.useMemo(() => {
+    if (ads.length === 0) return null;
+    let oldest = ads[0];
+    for (let i = 1; i < ads.length; i++) {
+      if (getAdTime(ads[i]) < getAdTime(oldest)) {
+        oldest = ads[i];
+      }
+    }
+    return oldest.id;
+  }, [ads]);
+
   const loadInitialAds = React.useCallback(async () => {
     try {
       setIsLoading(true);
       const data = await adService.getLatest(0, 5);
       const activeAds = data
         .filter(ad => ad.status === 'active')
-        .sort((a, b) => getAdTime(a) - getAdTime(b));
+        .sort((a, b) => getAdTime(b) - getAdTime(a));
       setAds(activeAds);
       setPage(0);
       setHasMore(data.length === 5);
@@ -63,7 +74,7 @@ export default function Feed() {
       setAds(prev => {
         const existingIds = new Set(prev.map(a => a.id));
         const newUniqueAds = data.filter(ad => ad.status === 'active' && !existingIds.has(ad.id));
-        return [...prev, ...newUniqueAds].sort((a, b) => getAdTime(a) - getAdTime(b));
+        return [...prev, ...newUniqueAds].sort((a, b) => getAdTime(b) - getAdTime(a));
       });
       setPage(nextPage);
       setHasMore(data.length === 5);
@@ -155,24 +166,9 @@ export default function Feed() {
             ref={index === ads.length - 1 ? loader : null}
             className="w-full h-full flex-shrink-0 snap-start"
           >
-            <AdVideo ad={ad} isActive={index === activeIndex} />
+            <AdVideo ad={ad} isActive={index === activeIndex} isOldest={ad.id === oldestAdId} />
           </div>
         ))}
-        
-        {/* Loading Indicator / Intersection Trigger */}
-        <div className="w-full py-12 flex flex-col items-center justify-center gap-4 snap-start">
-          {hasMore ? (
-            <>
-              <div className="w-8 h-8 border-4 border-brand-orange/20 border-t-brand-orange rounded-full animate-spin" />
-              <p className="text-[10px] font-black text-white/40 uppercase tracking-widest animate-pulse">Carregando mais ofertas...</p>
-            </>
-          ) : (
-            <>
-              <div className="w-12 h-1 bg-white/10 rounded-full" />
-              <p className="text-[10px] font-black text-white/20 uppercase tracking-widest">Você chegou ao fim das novidades</p>
-            </>
-          )}
-        </div>
       </div>
       
       {/* Floating indicators as seen in design */}

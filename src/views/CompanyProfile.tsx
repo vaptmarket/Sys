@@ -26,11 +26,14 @@ import {
   Calendar,
   DollarSign,
   TrendingUp,
-  Heart
+  TrendingDown,
+  Heart,
+  QrCode
 } from 'lucide-react';
 import { motion } from 'motion/react';
 import { cn } from '../lib/utils';
 import toast from 'react-hot-toast';
+import QrCodeModal from '../components/QrCodeModal';
 
 export default function CompanyProfile() {
   const { id } = useParams();
@@ -42,6 +45,12 @@ export default function CompanyProfile() {
   const [isLoading, setIsLoading] = React.useState(true);
 
   const [copiedId, setCopiedId] = React.useState<string | null>(null);
+  const [selectedCoupon, setSelectedCoupon] = React.useState<{
+    code: string;
+    discountValue: string;
+    description: string;
+    companyName: string;
+  } | null>(null);
 
   // Management Mode States
   const [isManagementMode, setIsManagementMode] = React.useState(false);
@@ -501,15 +510,29 @@ export default function CompanyProfile() {
                         <p className="text-[10px] font-bold text-white/20 uppercase tracking-widest">Código</p>
                         <p className="text-xl font-black text-brand-orange tracking-widest font-mono">{coupon.code}</p>
                       </div>
-                      <button 
-                        onClick={() => handleCopyCode(coupon.id, coupon.code)}
-                        className={cn(
-                          "w-10 h-10 rounded-xl flex items-center justify-center transition-all cursor-pointer",
-                          copiedId === coupon.id ? "bg-brand-green text-black" : "bg-brand-orange text-white hover:scale-110"
-                        )}
-                      >
-                        {copiedId === coupon.id ? <Check size={18} /> : <Copy size={18} />}
-                      </button>
+                      <div className="flex gap-2 shrink-0">
+                        <button 
+                          onClick={() => setSelectedCoupon({
+                            code: coupon.code,
+                            discountValue: coupon.discountValue,
+                            description: coupon.description,
+                            companyName: company?.name || 'Parceiro Verificado'
+                          })}
+                          className="w-10 h-10 rounded-xl bg-white/5 text-white hover:bg-brand-blue hover:text-white flex items-center justify-center transition-all cursor-pointer"
+                          title="Visualizar QR Code"
+                        >
+                          <QrCode size={18} />
+                        </button>
+                        <button 
+                          onClick={() => handleCopyCode(coupon.id, coupon.code)}
+                          className={cn(
+                            "w-10 h-10 rounded-xl flex items-center justify-center transition-all cursor-pointer",
+                            copiedId === coupon.id ? "bg-brand-green text-black" : "bg-brand-orange text-white hover:scale-110"
+                          )}
+                        >
+                          {copiedId === coupon.id ? <Check size={18} /> : <Copy size={18} />}
+                        </button>
+                      </div>
                     </div>
 
                     <div className="mt-4 flex items-center gap-2 text-[10px] font-bold text-white/30 uppercase tracking-widest">
@@ -1172,6 +1195,15 @@ export default function CompanyProfile() {
           )}
         </div>
       )}
+
+      <QrCodeModal 
+        isOpen={selectedCoupon !== null}
+        onClose={() => setSelectedCoupon(null)}
+        code={selectedCoupon?.code || ''}
+        discountValue={selectedCoupon?.discountValue || ''}
+        description={selectedCoupon?.description || ''}
+        companyName={selectedCoupon?.companyName || ''}
+      />
     </div>
   );
 }

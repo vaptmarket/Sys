@@ -2,15 +2,22 @@ import React from 'react';
 import { couponService, companyService } from '../services/mockFirebase';
 import { Coupon, Company } from '../types';
 import { motion } from 'motion/react';
-import { Ticket, Copy, Check, Tag, Info, ShoppingBag } from 'lucide-react';
+import { Ticket, Copy, Check, Tag, Info, ShoppingBag, QrCode } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { Link } from 'react-router-dom';
+import QrCodeModal from '../components/QrCodeModal';
 
 export default function Cupons() {
   const [coupons, setCoupons] = React.useState<Coupon[]>([]);
   const [companies, setCompanies] = React.useState<Company[]>([]);
   const [isLoading, setIsLoading] = React.useState(true);
   const [copiedId, setCopiedId] = React.useState<string | null>(null);
+  const [selectedCoupon, setSelectedCoupon] = React.useState<{
+    code: string;
+    discountValue: string;
+    description: string;
+    companyName: string;
+  } | null>(null);
 
   React.useEffect(() => {
     let active = true;
@@ -128,15 +135,29 @@ export default function Cupons() {
                   <div className="font-mono text-xl font-black text-brand-orange tracking-widest px-2">
                     {coupon.code}
                   </div>
-                  <button 
-                    onClick={() => handleCopyCode(coupon.id, coupon.code)}
-                    className={cn(
-                      "w-10 h-10 rounded-xl flex items-center justify-center transition-all",
-                      copiedId === coupon.id ? "bg-brand-green text-black" : "bg-white/5 text-white hover:bg-brand-orange"
-                    )}
-                  >
-                    {copiedId === coupon.id ? <Check size={18} /> : <Copy size={18} />}
-                  </button>
+                  <div className="flex gap-2 shrink-0">
+                    <button 
+                      onClick={() => setSelectedCoupon({
+                        code: coupon.code,
+                        discountValue: coupon.discountValue,
+                        description: coupon.description,
+                        companyName: company?.name || 'Parceiro Verificado'
+                      })}
+                      className="w-10 h-10 rounded-xl bg-white/5 text-white hover:bg-brand-blue hover:text-white flex items-center justify-center transition-all cursor-pointer"
+                      title="Visualizar QR Code"
+                    >
+                      <QrCode size={18} />
+                    </button>
+                    <button 
+                      onClick={() => handleCopyCode(coupon.id, coupon.code)}
+                      className={cn(
+                        "w-10 h-10 rounded-xl flex items-center justify-center transition-all cursor-pointer",
+                        copiedId === coupon.id ? "bg-brand-green text-black" : "bg-white/5 text-white hover:bg-brand-orange"
+                      )}
+                    >
+                      {copiedId === coupon.id ? <Check size={18} /> : <Copy size={18} />}
+                    </button>
+                  </div>
                 </div>
 
                 <div className="flex items-center justify-between text-[10px] font-bold uppercase tracking-widest text-white/30">
@@ -170,6 +191,15 @@ export default function Cupons() {
            Ganhar Visibilidade Agora
          </Link>
       </div>
+
+      <QrCodeModal 
+        isOpen={selectedCoupon !== null}
+        onClose={() => setSelectedCoupon(null)}
+        code={selectedCoupon?.code || ''}
+        discountValue={selectedCoupon?.discountValue || ''}
+        description={selectedCoupon?.description || ''}
+        companyName={selectedCoupon?.companyName || ''}
+      />
     </div>
   );
 }
