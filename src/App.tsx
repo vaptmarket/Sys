@@ -12,6 +12,7 @@ import Profile from './views/Profile';
 import QueroAnunciar from './views/QueroAnunciar';
 import Admin from './views/Admin';
 import Login from './views/Login';
+import AuthGate from './components/AuthGate';
 import { Toaster } from 'react-hot-toast';
 
 function App() {
@@ -36,14 +37,14 @@ function App() {
       <Layout>
         <Routes>
           <Route path="/" element={<Feed />} />
-          <Route path="/categorias" element={<Categories />} />
-          <Route path="/busca" element={<Search />} />
-          <Route path="/cupons" element={<Cupons />} />
-          <Route path="/anuncio/:id" element={<AdDetails />} />
-          <Route path="/empresa/:id" element={<CompanyProfile />} />
-          <Route path="/anunciar" element={<QueroAnunciar />} />
-          <Route path="/admin" element={<Admin />} />
-          <Route path="/perfil" element={<Profile />} />
+          <Route path="/categorias" element={<AuthGate><Categories /></AuthGate>} />
+          <Route path="/busca" element={<AuthGate><Search /></AuthGate>} />
+          <Route path="/cupons" element={<AuthGate><Cupons /></AuthGate>} />
+          <Route path="/anuncio/:id" element={<AuthGate><AdDetails /></AuthGate>} />
+          <Route path="/empresa/:id" element={<AuthGate><CompanyProfile /></AuthGate>} />
+          <Route path="/anunciar" element={<AuthGate><QueroAnunciar /></AuthGate>} />
+          <Route path="/admin" element={<AuthGate requireAdmin><Admin /></AuthGate>} />
+          <Route path="/perfil" element={<AuthGate><Profile /></AuthGate>} />
           <Route path="/login" element={<Login initialMode="login" />} />
           <Route path="/cadastro" element={<Login initialMode="signup" />} />
         </Routes>

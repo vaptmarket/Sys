@@ -126,9 +126,11 @@ export default function Layout({ children }: { children: React.ReactNode }) {
              <p className="text-xs text-white/40 leading-relaxed font-medium">Logado como <span className="text-white">São Paulo, SP</span></p>
              <button className="mt-2 text-brand-blue text-[10px] font-bold uppercase tracking-widest hover:underline">Alterar Localização</button>
           </div>
-          <Link to="/admin" className="block w-full py-3 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl text-center text-[10px] font-bold text-white/40 uppercase tracking-widest transition-all">
-            Painel Admin
-          </Link>
+          {user && user.role === 'admin' && (
+            <Link to="/admin" className="block w-full py-3 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl text-center text-[10px] font-bold text-white/40 uppercase tracking-widest transition-all">
+              Painel Admin
+            </Link>
+          )}
         </div>
       </aside>
 
