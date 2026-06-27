@@ -37,7 +37,7 @@ export default function Feed() {
       const data = await adService.getLatest(0, 5);
       const activeAds = data
         .filter(ad => ad.status === 'active')
-        .sort((a, b) => getAdTime(b) - getAdTime(a));
+        .sort((a, b) => getAdTime(a) - getAdTime(b));
       setAds(activeAds);
       setPage(0);
       setHasMore(data.length === 5);
@@ -63,7 +63,7 @@ export default function Feed() {
       setAds(prev => {
         const existingIds = new Set(prev.map(a => a.id));
         const newUniqueAds = data.filter(ad => ad.status === 'active' && !existingIds.has(ad.id));
-        return [...prev, ...newUniqueAds].sort((a, b) => getAdTime(b) - getAdTime(a));
+        return [...prev, ...newUniqueAds].sort((a, b) => getAdTime(a) - getAdTime(b));
       });
       setPage(nextPage);
       setHasMore(data.length === 5);
