@@ -38,7 +38,10 @@ import {
   ShoppingCart,
   Building2,
   Shirt,
-  HelpCircle
+  HelpCircle,
+  ArrowUpDown,
+  ArrowUp,
+  ArrowDown
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '../lib/utils';
@@ -357,7 +360,73 @@ export default function Admin() {
     },
   ];
 
-  const filteredAdsShow = ads.filter(ad => statusFilter === 'all' || ad.status === statusFilter);
+  const [sortConfig, setSortConfig] = React.useState<{
+    key: 'companyName' | 'title' | 'status' | 'featured' | 'startDate' | 'expiresAt' | null;
+    direction: 'asc' | 'desc';
+  }>({ key: null, direction: 'asc' });
+
+  const handleSort = (key: 'companyName' | 'title' | 'status' | 'featured' | 'startDate' | 'expiresAt') => {
+    let direction: 'asc' | 'desc' = 'asc';
+    if (sortConfig.key === key && sortConfig.direction === 'asc') {
+      direction = 'desc';
+    }
+    setSortConfig({ key, direction });
+  };
+
+  const filteredAdsShow = React.useMemo(() => {
+    const filtered = ads.filter(ad => statusFilter === 'all' || ad.status === statusFilter);
+    if (!sortConfig.key) return filtered;
+
+    return [...filtered].sort((a, b) => {
+      let aVal: any;
+      let bVal: any;
+
+      if (sortConfig.key === 'startDate') {
+        const parseDate = (dStr: string | undefined, fallback: number) => {
+          if (!dStr) return fallback;
+          const parsed = Date.parse(dStr);
+          if (!isNaN(parsed)) return parsed;
+          const parts = dStr.split('/');
+          if (parts.length === 3) {
+            const d = new Date(parseInt(parts[2]), parseInt(parts[1]) - 1, parseInt(parts[0]));
+            if (!isNaN(d.getTime())) return d.getTime();
+          }
+          return fallback;
+        };
+        aVal = parseDate(a.startDate, a.createdAt || 0);
+        bVal = parseDate(b.startDate, b.createdAt || 0);
+      } else if (sortConfig.key === 'expiresAt') {
+        aVal = a.expiresAt ? new Date(a.expiresAt).getTime() : 0;
+        bVal = b.expiresAt ? new Date(b.expiresAt).getTime() : 0;
+      } else if (sortConfig.key === 'featured') {
+        aVal = a.featured ? 1 : 0;
+        bVal = b.featured ? 1 : 0;
+      } else {
+        aVal = (a[sortConfig.key] || '').toString().toLowerCase();
+        bVal = (b[sortConfig.key] || '').toString().toLowerCase();
+      }
+
+      if (aVal < bVal) {
+        return sortConfig.direction === 'asc' ? -1 : 1;
+      }
+      if (aVal > bVal) {
+        return sortConfig.direction === 'asc' ? 1 : -1;
+      }
+      return 0;
+    });
+  }, [ads, statusFilter, sortConfig]);
+
+  const renderSortIndicator = (key: 'companyName' | 'title' | 'status' | 'featured' | 'startDate' | 'expiresAt') => {
+    if (sortConfig.key !== key) {
+      return <ArrowUpDown size={10} className="text-white/10 opacity-0 group-hover:opacity-100 transition-opacity ml-1 inline-block" />;
+    }
+    return sortConfig.direction === 'asc' ? (
+      <ArrowUp size={10} className="text-brand-blue ml-1 inline-block" />
+    ) : (
+      <ArrowDown size={10} className="text-brand-blue ml-1 inline-block" />
+    );
+  };
+
   const pendingAds = ads.filter(ad => ad.status === 'pending');
 
   const handleUpdateAdStatus = async (id: string, newStatus: 'active' | 'pending' | 'rejected') => {
@@ -692,12 +761,37 @@ export default function Admin() {
             <div className="p-4 overflow-x-auto">
               <table className="w-full min-w-[500px]">
                 <thead>
-                  <tr className="text-[10px] font-black text-white/20 uppercase tracking-widest text-left">
-                    <th className="px-4 py-4">Empresa</th>
-                    <th className="px-4 py-4">Título</th>
-                    <th className="px-4 py-4">Status</th>
-                    <th className="px-4 py-4">Destaque</th>
-                    <th className="px-4 py-4">Vencimento</th>
+                  <tr className="text-[10px] font-black text-white/20 uppercase tracking-widest text-left select-none">
+                    <th className="px-4 py-4 cursor-pointer hover:text-white transition-colors group" onClick={() => handleSort('companyName')}>
+                      <span className="flex items-center gap-1">
+                        Empresa {renderSortIndicator('companyName')}
+                      </span>
+                    </th>
+                    <th className="px-4 py-4 cursor-pointer hover:text-white transition-colors group" onClick={() => handleSort('title')}>
+                      <span className="flex items-center gap-1">
+                        Título {renderSortIndicator('title')}
+                      </span>
+                    </th>
+                    <th className="px-4 py-4 cursor-pointer hover:text-white transition-colors group" onClick={() => handleSort('status')}>
+                      <span className="flex items-center gap-1">
+                        Status {renderSortIndicator('status')}
+                      </span>
+                    </th>
+                    <th className="px-4 py-4 cursor-pointer hover:text-white transition-colors group" onClick={() => handleSort('featured')}>
+                      <span className="flex items-center gap-1">
+                        Destaque {renderSortIndicator('featured')}
+                      </span>
+                    </th>
+                    <th className="px-4 py-4 cursor-pointer hover:text-white transition-colors group" onClick={() => handleSort('startDate')}>
+                      <span className="flex items-center gap-1">
+                        Início {renderSortIndicator('startDate')}
+                      </span>
+                    </th>
+                    <th className="px-4 py-4 cursor-pointer hover:text-white transition-colors group" onClick={() => handleSort('expiresAt')}>
+                      <span className="flex items-center gap-1">
+                        Vencimento {renderSortIndicator('expiresAt')}
+                      </span>
+                    </th>
                     <th className="px-4 py-4"></th>
                   </tr>
                 </thead>
@@ -773,7 +867,14 @@ export default function Admin() {
                         </button>
                       </td>
                       <td className="px-4 py-6">
-                        <span className="text-[10px] font-bold text-white/40">{new Date(ad.expiresAt).toLocaleDateString()}</span>
+                        <span className="text-[10px] font-bold text-white/40">
+                          {ad.startDate && ad.startDate.split('-').length === 3 
+                            ? `${ad.startDate.split('-')[2]}/${ad.startDate.split('-')[1]}/${ad.startDate.split('-')[0]}` 
+                            : new Date(ad.createdAt || Date.now()).toLocaleDateString('pt-BR')}
+                        </span>
+                      </td>
+                      <td className="px-4 py-6">
+                        <span className="text-[10px] font-bold text-white/40">{new Date(ad.expiresAt).toLocaleDateString('pt-BR')}</span>
                       </td>
                       <td className="px-4 py-6 text-right">
                         <div className="flex items-center justify-end gap-2">

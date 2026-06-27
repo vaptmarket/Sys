@@ -32,6 +32,7 @@ export const MOCK_ADS: Ad[] = [
     coords: { lat: -23.7915, lng: -45.5564 },
     couponId: 'cp1',
     createdAt: Date.now() - 3600000, // 1 hour ago
+    startDate: '2026-06-25',
     description: 'Aproveite o final de semana na melhor pousada de Maresias. Suítes completas com ar condicionado, frigobar e café da manhã incluso.',
     images: [
       'https://images.unsplash.com/photo-1582719478250-c89cae4dc85b?auto=format&fit=crop&w=800&q=80',
@@ -59,6 +60,7 @@ export const MOCK_ADS: Ad[] = [
     coords: { lat: -23.8166, lng: -45.3601 },
     couponId: 'cp2',
     createdAt: Date.now(), // just now
+    startDate: '2026-06-27',
     description: 'Camarões frescos selecionados com molho especial da casa. Servido com arroz de coco e batata rústica.'
   },
   {
@@ -80,6 +82,7 @@ export const MOCK_ADS: Ad[] = [
     views: 0,
     status: 'pending',
     createdAt: Date.now() - 86400000,
+    startDate: '2026-06-26',
   }
 ];
 

@@ -14,11 +14,30 @@ export default function Feed() {
   const loader = React.useRef<HTMLDivElement>(null);
   const scrollContainerRef = React.useRef<HTMLDivElement>(null);
 
+  const getAdTime = (ad: Ad) => {
+    if (ad.startDate) {
+      if (typeof ad.startDate === 'string') {
+        const parsed = Date.parse(ad.startDate);
+        if (!isNaN(parsed)) return parsed;
+        const parts = ad.startDate.split('/');
+        if (parts.length === 3) {
+          const d = new Date(parseInt(parts[2]), parseInt(parts[1]) - 1, parseInt(parts[0]));
+          if (!isNaN(d.getTime())) return d.getTime();
+        }
+      }
+      const time = new Date(ad.startDate).getTime();
+      if (!isNaN(time)) return time;
+    }
+    return ad.createdAt || 0;
+  };
+
   const loadInitialAds = React.useCallback(async () => {
     try {
       setIsLoading(true);
       const data = await adService.getLatest(0, 5);
-      const activeAds = data.filter(ad => ad.status === 'active');
+      const activeAds = data
+        .filter(ad => ad.status === 'active')
+        .sort((a, b) => getAdTime(b) - getAdTime(a));
       setAds(activeAds);
       setPage(0);
       setHasMore(data.length === 5);
@@ -44,7 +63,7 @@ export default function Feed() {
       setAds(prev => {
         const existingIds = new Set(prev.map(a => a.id));
         const newUniqueAds = data.filter(ad => ad.status === 'active' && !existingIds.has(ad.id));
-        return [...prev, ...newUniqueAds];
+        return [...prev, ...newUniqueAds].sort((a, b) => getAdTime(b) - getAdTime(a));
       });
       setPage(nextPage);
       setHasMore(data.length === 5);

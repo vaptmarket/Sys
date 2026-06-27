@@ -434,8 +434,30 @@ export default function AdEditor({ ad, categories, companies = [], coupons = [],
             </div>
           </div>
 
-          {/* Vencimento e Cupom Associado */}
+          {/* Datas de Postagem e Expiração */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+            {/* Start Date / Data de Início */}
+            <div className="space-y-3">
+              <label className="flex items-center gap-2 text-[10px] font-black text-white/40 uppercase tracking-widest">
+                <Calendar size={14} /> Data de Início da Postagem
+              </label>
+              <input
+                type="date"
+                name="startDate"
+                value={formData.startDate ? formData.startDate.substring(0, 10) : ''}
+                onChange={(e) => {
+                  const dateStr = e.target.value;
+                  setFormData(prev => ({
+                    ...prev,
+                    startDate: dateStr
+                  }));
+                }}
+                required
+                disabled={isSaving}
+                className="w-full bg-white/5 border border-white/10 rounded-2xl px-6 py-4 text-white font-bold focus:outline-none focus:border-brand-blue transition-all disabled:opacity-50"
+              />
+            </div>
+
             {/* Expires At */}
             <div className="space-y-3">
               <label className="flex items-center gap-2 text-[10px] font-black text-white/40 uppercase tracking-widest">
@@ -457,7 +479,10 @@ export default function AdEditor({ ad, categories, companies = [], coupons = [],
                 className="w-full bg-white/5 border border-white/10 rounded-2xl px-6 py-4 text-white font-bold focus:outline-none focus:border-brand-blue transition-all disabled:opacity-50"
               />
             </div>
+          </div>
 
+          {/* Cupom Associado */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
             {/* Associated Coupon */}
             <div className="space-y-3">
               <label className="flex items-center gap-2 text-[10px] font-black text-white/40 uppercase tracking-widest">

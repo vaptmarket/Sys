@@ -85,6 +85,7 @@ export interface Ad {
   images?: string[];
   featured?: boolean;
   createdAt: number;
+  startDate?: string;
 }
 
 export interface UserSaved {

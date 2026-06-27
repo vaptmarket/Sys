@@ -56,7 +56,8 @@ export default function QueroAnunciar() {
     neighborhood: '',
     city: '',
     state: '',
-    location: '' // Assembled info or fallback
+    location: '', // Assembled info or fallback
+    startDate: new Date().toISOString().substring(0, 10)
   });
 
   const formatCEP = (value: string) => {
@@ -365,6 +366,7 @@ export default function QueroAnunciar() {
         views: 0,
         status: 'active',
         createdAt: Date.now(),
+        startDate: formData.startDate || new Date().toISOString().substring(0, 10),
         expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
       });
       
@@ -675,7 +677,7 @@ export default function QueroAnunciar() {
                    />
                  </div>
                </div>
-               <div className="md:col-span-2 space-y-2">
+               <div className=" space-y-2">
                  <label className="text-[10px] font-black text-white/40 uppercase tracking-widest ml-1">Parcelamento</label>
                  <input 
                    type="text" 
@@ -685,6 +687,16 @@ export default function QueroAnunciar() {
                    className="w-full bg-[#1e2024] border-none rounded-xl py-4 px-6 text-white text-sm focus:ring-2 focus:ring-brand-blue" 
                  />
                </div>
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-white/40 uppercase tracking-widest ml-1">Data de Início da Postagem</label>
+                  <input 
+                    type="date" 
+                    value={formData.startDate}
+                    onChange={(e) => setFormData(prev => ({ ...prev, startDate: e.target.value }))}
+                    className="w-full bg-[#1e2024] border-none rounded-xl py-4 px-6 text-white text-sm focus:ring-2 focus:ring-brand-blue" 
+                    required
+                  />
+                </div>
             </div>
 
             <div className="flex gap-4">

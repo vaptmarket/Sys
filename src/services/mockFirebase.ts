@@ -175,6 +175,24 @@ seedCollection('ads', MOCK_ADS).catch(e => console.warn('Ads auto-seed deferred'
 seedCollection('coupons', MOCK_COUPONS).catch(e => console.warn('Coupons auto-seed deferred', e));
 
 
+const getAdSortTime = (ad: any): number => {
+  if (ad && ad.startDate) {
+    if (typeof ad.startDate === 'string') {
+      const parsed = Date.parse(ad.startDate);
+      if (!isNaN(parsed)) return parsed;
+      const parts = ad.startDate.split('/');
+      if (parts.length === 3) {
+        const d = new Date(parseInt(parts[2]), parseInt(parts[1]) - 1, parseInt(parts[0]));
+        if (!isNaN(d.getTime())) return d.getTime();
+      }
+    }
+    const time = new Date(ad.startDate).getTime();
+    if (!isNaN(time)) return time;
+  }
+  return ad && ad.createdAt ? ad.createdAt : 0;
+};
+
+
 export const adService = {
   async getAll(): Promise<Ad[]> {
     try {
@@ -184,10 +202,10 @@ export const adService = {
       snap.forEach(d => {
         ads.push({ id: d.id, ...d.data() } as Ad);
       });
-      return ads.sort((a, b) => b.createdAt - a.createdAt);
+      return ads.sort((a, b) => getAdSortTime(b) - getAdSortTime(a));
     } catch (e) {
       console.error('Firestore ads.getAll error, fallback to local:', e);
-      return [...currentData.ads].sort((a, b) => b.createdAt - a.createdAt);
+      return [...currentData.ads].sort((a, b) => getAdSortTime(b) - getAdSortTime(a));
     }
   },
 
@@ -214,13 +232,13 @@ export const adService = {
           ads.push(item);
         }
       });
-      ads.sort((a, b) => b.createdAt - a.createdAt);
+      ads.sort((a, b) => getAdSortTime(b) - getAdSortTime(a));
       const start = page * limitCount;
       return ads.slice(start, start + limitCount);
     } catch (e) {
       console.error('Firestore getLatest error, fallback to local:', e);
       const activeAds = currentData.ads.filter((ad: Ad) => ad.status === 'active');
-      const sortedAds = [...activeAds].sort((a, b) => b.createdAt - a.createdAt);
+      const sortedAds = [...activeAds].sort((a, b) => getAdSortTime(b) - getAdSortTime(a));
       const start = page * limitCount;
       return sortedAds.slice(start, start + limitCount);
     }
@@ -385,7 +403,7 @@ export const adService = {
         snap.forEach(d => {
           ads.push({ id: d.id, ...d.data() } as Ad);
         });
-        ads.sort((a, b) => b.createdAt - a.createdAt);
+        ads.sort((a, b) => getAdSortTime(b) - getAdSortTime(a));
         callback(ads);
       }, (err) => {
         console.error('Firestore subscribeAds error, using local fallback:', err);
@@ -393,7 +411,7 @@ export const adService = {
     });
 
     const localUnsub = events.subscribe('ads_updated', (ads) => {
-      callback([...ads].sort((a, b) => b.createdAt - a.createdAt));
+      callback([...ads].sort((a, b) => getAdSortTime(b) - getAdSortTime(a)));
     });
 
     return () => {
@@ -413,6 +431,7 @@ export const adService = {
       saved: adData.saved || 0,
       views: adData.views || 0,
       createdAt: adData.createdAt || Date.now(),
+      startDate: adData.startDate || new Date().toISOString().substring(0, 10),
       status: adData.status || 'pending',
       companyLogo: adData.companyLogo || 'https://images.unsplash.com/photo-1560179707-f14e90ef3623?auto=format&fit=crop&w=100&q=80',
       companyName: adData.companyName || 'Admin Post'
