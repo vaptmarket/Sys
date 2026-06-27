@@ -2,6 +2,7 @@ import React from 'react';
 import { useParams, Link, useSearchParams } from 'react-router-dom';
 import { adService, companyService, couponService } from '../services/mockFirebase';
 import { Company, Ad, Coupon } from '../types';
+import { useAuth } from '../hooks/useAuth';
 import { 
   Instagram, 
   Globe, 
@@ -34,6 +35,7 @@ import toast from 'react-hot-toast';
 export default function CompanyProfile() {
   const { id } = useParams();
   const [searchParams] = useSearchParams();
+  const { user } = useAuth();
   const [company, setCompany] = React.useState<Company | null>(null);
   const [ads, setAds] = React.useState<Ad[]>([]);
   const [coupons, setCoupons] = React.useState<Coupon[]>([]);
@@ -57,6 +59,18 @@ export default function CompanyProfile() {
   const [compWebsite, setCompWebsite] = React.useState('');
   const [compLogo, setCompLogo] = React.useState('');
   const [compCategory, setCompCategory] = React.useState('');
+  const [compCnpj, setCompCnpj] = React.useState('');
+  const [compCep, setCompCep] = React.useState('');
+  const [compStreet, setCompStreet] = React.useState('');
+  const [compNumber, setCompNumber] = React.useState('');
+  const [compComplement, setCompComplement] = React.useState('');
+  const [compNeighborhood, setCompNeighborhood] = React.useState('');
+  const [compCity, setCompCity] = React.useState('');
+  const [compState, setCompState] = React.useState('');
+  const [compEmail, setCompEmail] = React.useState('');
+  const [compUserId, setCompUserId] = React.useState('');
+  const [compVerified, setCompVerified] = React.useState(false);
+  const [compStatus, setCompStatus] = React.useState<'pending' | 'active' | 'rejected'>('active');
   const [isSavingProfile, setIsSavingProfile] = React.useState(false);
 
   // New Coupon fields
@@ -66,13 +80,22 @@ export default function CompanyProfile() {
   const [newCouponExpiry, setNewCouponExpiry] = React.useState('');
   const [isCreatingCoupon, setIsCreatingCoupon] = React.useState(false);
 
+  const hasManagementAccess = React.useMemo(() => {
+    if (!user) return false;
+    if (user.role === 'admin') return true;
+    if (company && (company.userId === user.uid || company.email === user.email)) return true;
+    return false;
+  }, [user, company]);
+
   const manageParam = searchParams.get('manage');
 
   React.useEffect(() => {
-    if (manageParam === 'true') {
+    if (manageParam === 'true' && hasManagementAccess) {
       setIsManagementMode(true);
+    } else {
+      setIsManagementMode(false);
     }
-  }, [manageParam]);
+  }, [manageParam, hasManagementAccess]);
 
   React.useEffect(() => {
     if (company) {
@@ -86,6 +109,18 @@ export default function CompanyProfile() {
       setCompWebsite(company.website || '');
       setCompLogo(company.logo || '');
       setCompCategory(company.category || 'Restaurantes');
+      setCompCnpj(company.cnpj || '');
+      setCompCep(company.cep || '');
+      setCompStreet(company.street || '');
+      setCompNumber(company.number || '');
+      setCompComplement(company.complement || '');
+      setCompNeighborhood(company.neighborhood || '');
+      setCompCity(company.city || '');
+      setCompState(company.state || '');
+      setCompEmail(company.email || '');
+      setCompUserId(company.userId || '');
+      setCompVerified(!!company.verified);
+      setCompStatus(company.status || 'active');
     }
   }, [company]);
 
@@ -264,7 +299,19 @@ export default function CompanyProfile() {
         instagram: compInstagram.trim(),
         website: compWebsite.trim(),
         logo: compLogo.trim(),
-        category: compCategory
+        category: compCategory,
+        cnpj: compCnpj.trim(),
+        cep: compCep.trim(),
+        street: compStreet.trim(),
+        number: compNumber.trim(),
+        complement: compComplement.trim(),
+        neighborhood: compNeighborhood.trim(),
+        city: compCity.trim(),
+        state: compState.trim(),
+        email: compEmail.trim(),
+        userId: compUserId.trim(),
+        verified: compVerified,
+        status: compStatus
       });
 
       await refreshCompanyData();
@@ -304,6 +351,50 @@ export default function CompanyProfile() {
 
   return (
     <div className="w-full max-w-6xl mx-auto px-1 md:px-0 font-sans">
+      {/* ADMIN CONTROLS BANNER */}
+      {hasManagementAccess && (
+        <div className="relative z-20 bg-white/[0.02] border border-white/10 rounded-3xl p-5 flex flex-col md:flex-row items-center justify-between gap-4 mb-6 text-left">
+          <div className="flex items-center gap-3">
+            <div className="w-12 h-12 rounded-2xl bg-brand-orange/10 text-brand-orange flex items-center justify-center shrink-0 border border-brand-orange/20">
+              <Settings className="animate-spin-slow text-brand-orange" size={22} />
+            </div>
+            <div>
+              <h4 className="text-sm font-black text-white uppercase italic tracking-tighter">
+                {user?.role === 'admin' ? 'Painel de Administrador Geral' : 'Painel de Gestor Comercial'}
+              </h4>
+              <p className="text-[10.5px] text-white/40 leading-snug">
+                {user?.role === 'admin' 
+                  ? 'Você possui acesso de Administrador do Vapt Market e pode alterar todos os dados desta empresa.'
+                  : 'Você possui acesso de gestor comercial para gerenciar esta empresa parceira do Vapt Market.'}
+              </p>
+            </div>
+          </div>
+          
+          <div className="flex items-center gap-2 bg-[#111317] border border-white/5 rounded-2xl p-1 shrink-0 w-full md:w-auto">
+            <button 
+              type="button"
+              onClick={() => setIsManagementMode(false)}
+              className={cn(
+                "flex-1 md:flex-initial px-5 py-2.5 text-[10px] font-black uppercase tracking-widest rounded-xl transition-all cursor-pointer",
+                !isManagementMode ? "bg-brand-blue text-white shadow-lg" : "text-white/40 hover:text-white"
+              )}
+            >
+              Visualizar Perfil
+            </button>
+            <button 
+              type="button"
+              onClick={() => setIsManagementMode(true)}
+              className={cn(
+                "flex-1 md:flex-initial px-5 py-2.5 text-[10px] font-black uppercase tracking-widest rounded-xl transition-all cursor-pointer",
+                isManagementMode ? "bg-brand-orange text-white shadow-lg" : "text-white/40 hover:text-white"
+              )}
+            >
+              Gerenciar Empresa
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Header Banner */}
       <div className="relative h-48 md:h-80 rounded-[2rem] md:rounded-[3rem] overflow-hidden mb-6 md:mb-8 shadow-2xl">
         <img 
@@ -315,47 +406,11 @@ export default function CompanyProfile() {
         <div className="absolute inset-0 bg-gradient-to-t from-[#0c0e12] via-transparent to-transparent" />
       </div>
 
-      {/* ADMIN CONTROLS BANNER */}
-      <div className="bg-white/[0.02] border border-white/10 rounded-3xl p-5 flex flex-col md:flex-row items-center justify-between gap-4 mb-10 text-left">
-        <div className="flex items-center gap-3">
-          <div className="w-12 h-12 rounded-2xl bg-brand-orange/10 text-brand-orange flex items-center justify-center shrink-0 border border-brand-orange/20">
-            <Settings className="animate-spin-slow text-brand-orange" size={22} />
-          </div>
-          <div>
-            <h4 className="text-sm font-black text-white uppercase italic tracking-tighter">Painel de Gestor Comercial</h4>
-            <p className="text-[10.5px] text-white/40 leading-snug">Você possui acesso administrativo para gerenciar esta empresa parceira do Vapt Market.</p>
-          </div>
-        </div>
-        
-        <div className="flex items-center gap-2 bg-[#111317] border border-white/5 rounded-2xl p-1 shrink-0 w-full md:w-auto">
-          <button 
-            type="button"
-            onClick={() => setIsManagementMode(false)}
-            className={cn(
-              "flex-1 md:flex-initial px-5 py-2.5 text-[10px] font-black uppercase tracking-widest rounded-xl transition-all cursor-pointer",
-              !isManagementMode ? "bg-brand-blue text-white shadow-lg" : "text-white/40 hover:text-white"
-            )}
-          >
-            Visualizar Perfil
-          </button>
-          <button 
-            type="button"
-            onClick={() => setIsManagementMode(true)}
-            className={cn(
-              "flex-1 md:flex-initial px-5 py-2.5 text-[10px] font-black uppercase tracking-widest rounded-xl transition-all cursor-pointer",
-              isManagementMode ? "bg-brand-orange text-white shadow-lg" : "text-white/40 hover:text-white"
-            )}
-          >
-            Gerenciar Empresa
-          </button>
-        </div>
-      </div>
-
       {!isManagementMode ? (
         <>
           {/* PUBLIC MODE VIEW */}
-          <div className="relative -mt-20 md:-mt-40 px-4 md:px-12 pb-8 md:pb-12 border-b border-white/5">
-            <div className="flex flex-col md:flex-row items-end gap-6 md:gap-8">
+          <div className="relative z-10 -mt-20 md:-mt-40 px-4 md:px-12 pb-8 md:pb-12 border-b border-white/5">
+            <div className="flex flex-col md:flex-row items-center md:items-end gap-6 md:gap-8">
               <div className="w-28 h-28 md:w-48 md:h-48 rounded-[1.5rem] md:rounded-[3rem] border-[4px] md:border-[6px] border-[#0c0e12] overflow-hidden shadow-xl bg-white shrink-0">
                 <img src={company.logo} alt={company.name} className="w-full h-full object-cover" />
               </div>
@@ -717,6 +772,169 @@ export default function CompanyProfile() {
                     className="w-full bg-white/5 border border-white/10 rounded-2xl px-5 py-4 text-white text-xs font-bold focus:outline-none focus:border-brand-blue transition-all"
                   />
                 </div>
+
+                {/* CNPJ */}
+                <div className="space-y-2.5">
+                  <label className="block text-[10px] font-black text-white/40 uppercase tracking-widest">CNPJ da Empresa</label>
+                  <input 
+                    type="text" 
+                    value={compCnpj}
+                    onChange={(e) => setCompCnpj(e.target.value)}
+                    placeholder="Ex: 00.000.000/0001-00"
+                    disabled={isSavingProfile}
+                    className="w-full bg-white/5 border border-white/10 rounded-2xl px-5 py-4 text-white text-xs font-bold focus:outline-none focus:border-brand-blue transition-all"
+                  />
+                </div>
+
+                {/* CEP */}
+                <div className="space-y-2.5">
+                  <label className="block text-[10px] font-black text-white/40 uppercase tracking-widest">CEP Comercial</label>
+                  <input 
+                    type="text" 
+                    value={compCep}
+                    onChange={(e) => setCompCep(e.target.value)}
+                    placeholder="Ex: 11600-000"
+                    disabled={isSavingProfile}
+                    className="w-full bg-white/5 border border-white/10 rounded-2xl px-5 py-4 text-white text-xs font-bold focus:outline-none focus:border-brand-blue transition-all"
+                  />
+                </div>
+
+                {/* Street */}
+                <div className="space-y-2.5">
+                  <label className="block text-[10px] font-black text-white/40 uppercase tracking-widest">Rua / Logradouro</label>
+                  <input 
+                    type="text" 
+                    value={compStreet}
+                    onChange={(e) => setCompStreet(e.target.value)}
+                    placeholder="Ex: Av. Dr. Francisco Loup"
+                    disabled={isSavingProfile}
+                    className="w-full bg-white/5 border border-white/10 rounded-2xl px-5 py-4 text-white text-xs font-bold focus:outline-none focus:border-brand-blue transition-all"
+                  />
+                </div>
+
+                {/* Number */}
+                <div className="space-y-2.5">
+                  <label className="block text-[10px] font-black text-white/40 uppercase tracking-widest">Número</label>
+                  <input 
+                    type="text" 
+                    value={compNumber}
+                    onChange={(e) => setCompNumber(e.target.value)}
+                    placeholder="Ex: 1250"
+                    disabled={isSavingProfile}
+                    className="w-full bg-white/5 border border-white/10 rounded-2xl px-5 py-4 text-white text-xs font-bold focus:outline-none focus:border-brand-blue transition-all"
+                  />
+                </div>
+
+                {/* Bairro */}
+                <div className="space-y-2.5">
+                  <label className="block text-[10px] font-black text-white/40 uppercase tracking-widest">Bairro</label>
+                  <input 
+                    type="text" 
+                    value={compNeighborhood}
+                    onChange={(e) => setCompNeighborhood(e.target.value)}
+                    placeholder="Ex: Maresias"
+                    disabled={isSavingProfile}
+                    className="w-full bg-white/5 border border-white/10 rounded-2xl px-5 py-4 text-white text-xs font-bold focus:outline-none focus:border-brand-blue transition-all"
+                  />
+                </div>
+
+                {/* Complement */}
+                <div className="space-y-2.5">
+                  <label className="block text-[10px] font-black text-white/40 uppercase tracking-widest">Complemento</label>
+                  <input 
+                    type="text" 
+                    value={compComplement}
+                    onChange={(e) => setCompComplement(e.target.value)}
+                    placeholder="Ex: Bloco B / Sala 4"
+                    disabled={isSavingProfile}
+                    className="w-full bg-white/5 border border-white/10 rounded-2xl px-5 py-4 text-white text-xs font-bold focus:outline-none focus:border-brand-blue transition-all"
+                  />
+                </div>
+
+                {/* City */}
+                <div className="space-y-2.5">
+                  <label className="block text-[10px] font-black text-white/40 uppercase tracking-widest">Cidade</label>
+                  <input 
+                    type="text" 
+                    value={compCity}
+                    onChange={(e) => setCompCity(e.target.value)}
+                    placeholder="Ex: São Sebastião"
+                    disabled={isSavingProfile}
+                    className="w-full bg-white/5 border border-white/10 rounded-2xl px-5 py-4 text-white text-xs font-bold focus:outline-none focus:border-brand-blue transition-all"
+                  />
+                </div>
+
+                {/* State */}
+                <div className="space-y-2.5">
+                  <label className="block text-[10px] font-black text-white/40 uppercase tracking-widest">Estado (UF)</label>
+                  <input 
+                    type="text" 
+                    value={compState}
+                    onChange={(e) => setCompState(e.target.value)}
+                    placeholder="Ex: SP"
+                    maxLength={2}
+                    disabled={isSavingProfile}
+                    className="w-full bg-white/5 border border-white/10 rounded-2xl px-5 py-4 text-white text-xs font-bold focus:outline-none focus:border-brand-blue transition-all uppercase"
+                  />
+                </div>
+
+                {/* Verification & Status toggles (Only visible to admin users) */}
+                {user?.role === 'admin' && (
+                  <>
+                    <div className="space-y-2.5">
+                      <label className="block text-[10px] font-black text-white/40 uppercase tracking-widest">Email do Proprietário (Admin)</label>
+                      <input 
+                        type="email" 
+                        value={compEmail}
+                        onChange={(e) => setCompEmail(e.target.value)}
+                        placeholder="Ex: joao@exemplo.com"
+                        disabled={isSavingProfile}
+                        className="w-full bg-white/5 border border-white/10 rounded-2xl px-5 py-4 text-white text-xs font-bold focus:outline-none focus:border-brand-blue transition-all"
+                      />
+                    </div>
+
+                    <div className="space-y-2.5">
+                      <label className="block text-[10px] font-black text-white/40 uppercase tracking-widest">ID de Usuário Proprietário (Admin)</label>
+                      <input 
+                        type="text" 
+                        value={compUserId}
+                        onChange={(e) => setCompUserId(e.target.value)}
+                        placeholder="ID único do usuário"
+                        disabled={isSavingProfile}
+                        className="w-full bg-white/5 border border-white/10 rounded-2xl px-5 py-4 text-white text-xs font-bold focus:outline-none focus:border-brand-blue transition-all"
+                      />
+                    </div>
+
+                    <div className="space-y-2.5">
+                      <label className="block text-[10px] font-black text-white/40 uppercase tracking-widest">Status da Parceria (Admin)</label>
+                      <select 
+                        value={compStatus}
+                        onChange={(e) => setCompStatus(e.target.value as 'pending' | 'active' | 'rejected')}
+                        disabled={isSavingProfile}
+                        className="w-full bg-[#1e2024] border border-white/10 rounded-2xl px-5 py-4 text-white text-xs font-bold focus:outline-none focus:border-brand-blue transition-all appearance-none"
+                      >
+                        <option value="active">Ativo / Aprovado</option>
+                        <option value="pending">Pendente de Aprovação</option>
+                        <option value="rejected">Rejeitado / Suspenso</option>
+                      </select>
+                    </div>
+
+                    <div className="space-y-2.5 flex flex-col justify-center">
+                      <span className="block text-[10px] font-black text-white/40 uppercase tracking-widest mb-1">Selo Verificado (Admin)</span>
+                      <label className="relative inline-flex items-center cursor-pointer select-none">
+                        <input 
+                          type="checkbox" 
+                          checked={compVerified} 
+                          onChange={(e) => setCompVerified(e.target.checked)}
+                          disabled={isSavingProfile}
+                          className="sr-only peer"
+                        />
+                        <div className="w-11 h-6 bg-white/15 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-brand-blue"></div>
+                        <span className="ml-3 text-xs font-bold text-white/60">Selo Ativado</span>
+                      </label>
+                    </div>
+                  </>
+                )}
               </div>
 
               <div className="pt-4 border-t border-white/5 flex justify-end">

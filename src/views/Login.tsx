@@ -23,6 +23,7 @@ export default function Login({ initialMode = 'login' }: LoginProps) {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [agreeTerms, setAgreeTerms] = useState(false);
+  const [chosenRole, setChosenRole] = useState<'cliente' | 'empresa'>('cliente');
   
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -91,7 +92,7 @@ export default function Login({ initialMode = 'login' }: LoginProps) {
         const loggedUser = await loginWithEmail(email, password);
         toast.success(`Bem-vindo de volta, ${loggedUser.displayName}!`);
       } else {
-        const newUser = await registerWithEmail(name, email, password);
+        const newUser = await registerWithEmail(name, email, password, chosenRole);
         toast.success(`Conta criada com sucesso! Boas-vindas, ${newUser.displayName}!`);
       }
       navigate(from, { replace: true });
@@ -175,22 +176,52 @@ export default function Login({ initialMode = 'login' }: LoginProps) {
         <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
           <div className="space-y-4">
             {mode === 'signup' && (
-              <div className="relative">
-                <label className="block text-[10px] font-black text-white/30 uppercase tracking-widest mb-1.5 px-1">Nome Completo</label>
+              <>
                 <div className="relative">
-                  <span className="absolute inset-y-0 left-0 pl-4 flex items-center text-white/20">
-                    <User size={18} />
-                  </span>
-                  <input
-                    type="text"
-                    required
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    placeholder="Ex: João Silva"
-                    className="block w-full pl-11 pr-4 py-3.5 bg-white/[0.03] border border-white/10 rounded-2xl text-white placeholder-white/20 font-medium text-sm focus:outline-none focus:border-brand-orange focus:ring-1 focus:ring-brand-orange transition-all"
-                  />
+                  <label className="block text-[10px] font-black text-white/30 uppercase tracking-widest mb-1.5 px-1">Nome Completo</label>
+                  <div className="relative">
+                    <span className="absolute inset-y-0 left-0 pl-4 flex items-center text-white/20">
+                      <User size={18} />
+                    </span>
+                    <input
+                      type="text"
+                      required
+                      value={name}
+                      onChange={(e) => setName(e.target.value)}
+                      placeholder="Ex: João Silva"
+                      className="block w-full pl-11 pr-4 py-3.5 bg-white/[0.03] border border-white/10 rounded-2xl text-white placeholder-white/20 font-medium text-sm focus:outline-none focus:border-brand-orange focus:ring-1 focus:ring-brand-orange transition-all"
+                    />
+                  </div>
                 </div>
-              </div>
+
+                <div className="space-y-1.5">
+                  <label className="block text-[10px] font-black text-white/30 uppercase tracking-widest mb-1.5 px-1">Tipo de Conta</label>
+                  <div className="grid grid-cols-2 gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setChosenRole('cliente')}
+                      className={`py-3 rounded-2xl border text-xs font-black uppercase tracking-widest transition-all ${
+                        chosenRole === 'cliente'
+                          ? 'bg-brand-orange/15 border-brand-orange text-brand-orange shadow-lg shadow-brand-orange/15'
+                          : 'bg-white/[0.03] border-white/10 text-white/40 hover:text-white'
+                      }`}
+                    >
+                      Cliente
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setChosenRole('empresa')}
+                      className={`py-3 rounded-2xl border text-xs font-black uppercase tracking-widest transition-all ${
+                        chosenRole === 'empresa'
+                          ? 'bg-brand-orange/15 border-brand-orange text-brand-orange shadow-lg shadow-brand-orange/15'
+                          : 'bg-white/[0.03] border-white/10 text-white/40 hover:text-white'
+                      }`}
+                    >
+                      Empresa
+                    </button>
+                  </div>
+                </div>
+              </>
             )}
 
             <div className="relative">

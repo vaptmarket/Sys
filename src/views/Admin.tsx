@@ -94,7 +94,7 @@ const CATEGORY_ICONS_LIST = [
 ];
 
 export default function Admin() {
-  const [activeTab, setActiveTab] = React.useState<'ads' | 'moderation' | 'categories' | 'companies' | 'settings'>('ads');
+  const [activeTab, setActiveTab] = React.useState<'ads' | 'moderation' | 'categories' | 'companies' | 'settings' | 'users'>('ads');
   const [ads, setAds] = React.useState<Ad[]>([]);
   const [categories, setCategories] = React.useState<{ id: string; name: Category | string; icon: string; imageUrl?: string; disabled?: boolean }[]>([]);
   const [coupons, setCoupons] = React.useState<Coupon[]>([]);
@@ -137,6 +137,156 @@ export default function Admin() {
     onConfirm: () => {},
     variant: 'danger'
   });
+
+  // User Management State and Functions
+  const [usersList, setUsersList] = React.useState<any[]>([]);
+  const [userSearch, setUserSearch] = React.useState('');
+  const [userRoleFilter, setUserRoleFilter] = React.useState<'all' | 'admin' | 'cliente' | 'empresa' | 'user'>('all');
+  const [isUserModalOpen, setIsUserModalOpen] = React.useState(false);
+  const [editingUser, setEditingUser] = React.useState<any | null>(null);
+  const [userForm, setUserForm] = React.useState({ displayName: '', email: '', password: '', role: 'cliente' as 'admin' | 'cliente' | 'empresa' | 'user' });
+
+  const fetchUsers = async () => {
+    try {
+      const { collection, getDocs } = await import('firebase/firestore');
+      const { db } = await import('../services/firebase');
+      const querySnapshot = await getDocs(collection(db, 'users'));
+      const firestoreUsers: any[] = [];
+      querySnapshot.forEach((doc) => {
+        firestoreUsers.push({ id: doc.id, ...doc.data() });
+      });
+
+      const savedUsersStr = localStorage.getItem('vapt_registered_users');
+      const localUsers = savedUsersStr ? JSON.parse(savedUsersStr) : [];
+
+      const mergedMap = new Map<string, any>();
+
+      localUsers.forEach((u: any) => {
+        const key = (u.uid || u.email || '').toLowerCase();
+        if (key) {
+          mergedMap.set(key, { ...u, source: 'local' });
+        }
+      });
+
+      firestoreUsers.forEach((u: any) => {
+        const key = (u.uid || u.id || u.email || '').toLowerCase();
+        if (key) {
+          const existing = mergedMap.get(key);
+          mergedMap.set(key, {
+            uid: u.uid || u.id,
+            email: u.email,
+            displayName: u.displayName || 'Usuário Vapt',
+            role: u.role || 'cliente',
+            createdAt: u.createdAt || Date.now(),
+            password: existing?.password || '123',
+            source: 'firestore'
+          });
+        }
+      });
+
+      const list = Array.from(mergedMap.values());
+      setUsersList(list);
+    } catch (err) {
+      console.error('Error fetching users:', err);
+      const savedUsersStr = localStorage.getItem('vapt_registered_users');
+      const localUsers = savedUsersStr ? JSON.parse(savedUsersStr) : [];
+      setUsersList(localUsers.map((u: any) => ({ ...u, source: 'local' })));
+    }
+  };
+
+  const handleSaveUser = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!userForm.displayName.trim() || !userForm.email.trim()) {
+      toast.error('Nome e E-mail são obrigatórios!');
+      return;
+    }
+
+    try {
+      const { doc, setDoc } = await import('firebase/firestore');
+      const { db } = await import('../services/firebase');
+
+      const isEdit = !!editingUser;
+      const targetUid = isEdit ? editingUser.uid : 'user_' + Date.now();
+
+      const userData = {
+        uid: targetUid,
+        displayName: userForm.displayName.trim(),
+        email: userForm.email.trim().toLowerCase(),
+        role: userForm.role,
+        createdAt: isEdit ? (editingUser.createdAt || Date.now()) : Date.now()
+      };
+
+      try {
+        const userDocRef = doc(db, 'users', targetUid);
+        await setDoc(userDocRef, userData, { merge: true });
+      } catch (fsErr) {
+        console.warn('Could not write to Firestore collection: ', fsErr);
+      }
+
+      const savedUsersStr = localStorage.getItem('vapt_registered_users');
+      let registeredUsers = savedUsersStr ? JSON.parse(savedUsersStr) : [];
+
+      const idx = registeredUsers.findIndex((u: any) => u.uid === targetUid || u.email.toLowerCase() === userData.email);
+      const userPassword = isEdit ? (editingUser.password || '123') : (userForm.password || '123');
+
+      if (idx !== -1) {
+        registeredUsers[idx] = {
+          ...registeredUsers[idx],
+          ...userData,
+          password: userPassword
+        };
+      } else {
+        registeredUsers.push({
+          ...userData,
+          password: userPassword
+        });
+      }
+      localStorage.setItem('vapt_registered_users', JSON.stringify(registeredUsers));
+
+      toast.success(isEdit ? 'Usuário atualizado com sucesso!' : 'Usuário cadastrado com sucesso!');
+      setIsUserModalOpen(false);
+      setEditingUser(null);
+      setUserForm({ displayName: '', email: '', password: '', role: 'cliente' });
+      fetchUsers();
+    } catch (err: any) {
+      toast.error(err?.message || 'Erro ao salvar usuário.');
+    }
+  };
+
+  const handleDeleteUser = async (uid: string, email: string) => {
+    setConfirmModal({
+      isOpen: true,
+      title: 'Remover Usuário',
+      message: `Tem certeza que deseja remover o usuário "${email}"? Esta ação não pode ser desfeita.`,
+      variant: 'danger',
+      onConfirm: async () => {
+        try {
+          const { doc, deleteDoc } = await import('firebase/firestore');
+          const { db } = await import('../services/firebase');
+
+          try {
+            await deleteDoc(doc(db, 'users', uid));
+          } catch (fsErr) {
+            console.warn('Could not delete from Firestore: ', fsErr);
+          }
+
+          const savedUsersStr = localStorage.getItem('vapt_registered_users');
+          if (savedUsersStr) {
+            let registeredUsers = JSON.parse(savedUsersStr);
+            registeredUsers = registeredUsers.filter((u: any) => u.uid !== uid && u.email !== email);
+            localStorage.setItem('vapt_registered_users', JSON.stringify(registeredUsers));
+          }
+
+          toast.success('Usuário removido com sucesso!');
+          fetchUsers();
+        } catch (err: any) {
+          toast.error(err?.message || 'Erro ao remover usuário.');
+        } finally {
+          setConfirmModal(prev => ({ ...prev, isOpen: false }));
+        }
+      }
+    });
+  };
 
   React.useEffect(() => {
     settingsService.getSettings().then(s => {
@@ -186,6 +336,8 @@ export default function Admin() {
       setAllCompanies(data);
       setIsLoading(false);
     });
+
+    fetchUsers();
 
     return () => unsubscribe();
   }, []);
@@ -676,6 +828,7 @@ export default function Admin() {
           { id: 'moderation', label: 'Moderação', icon: CheckCircle },
           { id: 'companies', label: 'Empresas', icon: Store },
           { id: 'categories', label: 'Categorias', icon: Tag },
+          { id: 'users', label: 'Usuários', icon: Users },
           { id: 'settings', label: 'Ajustes', icon: Settings },
         ].map(tab => (
           <button
@@ -1504,6 +1657,271 @@ export default function Admin() {
                 </tbody>
               </table>
             </div>
+          </motion.div>
+        )}
+
+        {activeTab === 'users' && (
+          <motion.div 
+            key="users"
+            initial={{ opacity: 0, x: -20 }} 
+            animate={{ opacity: 1, x: 0 }} 
+            exit={{ opacity: 0, x: 20 }}
+            className="space-y-6"
+          >
+            {/* Header Controls */}
+            <div className="flex flex-col md:flex-row gap-4 items-center justify-between bg-[#111317] p-6 rounded-[2rem] border border-white/5 shadow-xl">
+              <div className="flex flex-col md:flex-row gap-4 w-full md:w-auto flex-1">
+                {/* Search */}
+                <div className="relative flex-1 max-w-md">
+                  <input
+                    type="text"
+                    placeholder="Buscar usuários por nome ou e-mail..."
+                    value={userSearch}
+                    onChange={(e) => setUserSearch(e.target.value)}
+                    className="w-full bg-white/5 border border-white/10 rounded-2xl py-3 px-5 text-white placeholder-white/25 text-xs font-semibold focus:outline-none focus:border-brand-orange transition-all"
+                  />
+                </div>
+                {/* Role Filter */}
+                <select
+                  value={userRoleFilter}
+                  onChange={(e) => setUserRoleFilter(e.target.value as any)}
+                  className="bg-white/5 border border-white/10 rounded-2xl py-3 px-5 text-white/60 text-xs font-semibold focus:outline-none focus:border-brand-orange transition-all cursor-pointer"
+                >
+                  <option value="all" className="bg-[#111317] text-white">Todos os Níveis</option>
+                  <option value="admin" className="bg-[#111317] text-white">Admin</option>
+                  <option value="cliente" className="bg-[#111317] text-white">Cliente</option>
+                  <option value="empresa" className="bg-[#111317] text-white">Empresa</option>
+                </select>
+              </div>
+
+              {/* Add User Button */}
+              <button
+                onClick={() => {
+                  setEditingUser(null);
+                  setUserForm({ displayName: '', email: '', password: '', role: 'cliente' });
+                  setIsUserModalOpen(true);
+                }}
+                className="w-full md:w-auto px-6 py-3 bg-brand-orange text-white font-black uppercase tracking-widest text-[10px] rounded-2xl hover:bg-brand-orange/85 transition-all flex items-center justify-center gap-2 shadow-lg shadow-brand-orange/15 cursor-pointer"
+              >
+                <Plus size={14} />
+                Cadastrar Usuário
+              </button>
+            </div>
+
+            {/* Users Table / Grid */}
+            <div className="bg-[#111317] rounded-[2rem] border border-white/5 shadow-xl overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="w-full text-left border-collapse">
+                  <thead>
+                    <tr className="border-b border-white/5">
+                      <th className="py-4 px-6 text-[10px] font-black text-white/30 uppercase tracking-widest">Usuário</th>
+                      <th className="py-4 px-6 text-[10px] font-black text-white/30 uppercase tracking-widest">E-mail</th>
+                      <th className="py-4 px-6 text-[10px] font-black text-white/30 uppercase tracking-widest">Nível de Acesso</th>
+                      <th className="py-4 px-6 text-[10px] font-black text-white/30 uppercase tracking-widest text-right">Ações</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-white/[0.02]">
+                    {usersList
+                      .filter(u => {
+                        const searchLower = userSearch.toLowerCase();
+                        const matchesSearch = 
+                          (u.displayName || '').toLowerCase().includes(searchLower) ||
+                          (u.email || '').toLowerCase().includes(searchLower);
+
+                        const matchesRole = 
+                          userRoleFilter === 'all' || 
+                          u.role === userRoleFilter ||
+                          (userRoleFilter === 'cliente' && u.role === 'user');
+
+                        return matchesSearch && matchesRole;
+                      })
+                      .map(u => {
+                        const initial = (u.displayName || 'U').charAt(0).toUpperCase();
+                        const isUserAdmin = u.role === 'admin';
+                        const isUserEmpresa = u.role === 'empresa';
+                        const isUserCliente = u.role === 'cliente' || u.role === 'user' || !u.role;
+
+                        return (
+                          <motion.tr 
+                            key={u.uid}
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            className="hover:bg-white/[0.01] transition-colors"
+                          >
+                            <td className="py-4 px-6">
+                              <div className="flex items-center gap-3">
+                                <div className={cn(
+                                  "w-9 h-9 rounded-xl flex items-center justify-center font-bold text-xs text-white",
+                                  isUserAdmin ? "bg-rose-500/10 border border-rose-500/20 text-rose-400" :
+                                  isUserEmpresa ? "bg-amber-500/10 border border-amber-500/20 text-amber-400" :
+                                  "bg-blue-500/10 border border-blue-500/20 text-blue-400"
+                                )}>
+                                  {initial}
+                                </div>
+                                <span className="text-white text-xs font-bold">{u.displayName || 'Usuário Sem Nome'}</span>
+                              </div>
+                            </td>
+                            <td className="py-4 px-6">
+                              <span className="text-white/40 text-xs font-semibold">{u.email}</span>
+                            </td>
+                            <td className="py-4 px-6">
+                              {isUserAdmin && (
+                                <span className="inline-flex items-center px-3 py-1 rounded-full text-[9px] font-bold uppercase tracking-wider bg-rose-500/10 border border-rose-500/20 text-rose-400">
+                                  Administrador
+                                </span>
+                              )}
+                              {isUserEmpresa && (
+                                <span className="inline-flex items-center px-3 py-1 rounded-full text-[9px] font-bold uppercase tracking-wider bg-amber-500/10 border border-amber-500/20 text-amber-400">
+                                  Empresa
+                                </span>
+                              )}
+                              {isUserCliente && (
+                                <span className="inline-flex items-center px-3 py-1 rounded-full text-[9px] font-bold uppercase tracking-wider bg-blue-500/10 border border-blue-500/20 text-blue-400">
+                                  Cliente
+                                </span>
+                              )}
+                            </td>
+                            <td className="py-4 px-6 text-right">
+                              <div className="flex justify-end items-center gap-2">
+                                <button
+                                  onClick={() => {
+                                    setEditingUser(u);
+                                    setUserForm({
+                                      displayName: u.displayName || '',
+                                      email: u.email || '',
+                                      password: u.password || '',
+                                      role: (u.role === 'user' ? 'cliente' : u.role) || 'cliente'
+                                    });
+                                    setIsUserModalOpen(true);
+                                  }}
+                                  className="p-2 rounded-xl bg-white/5 border border-white/10 text-white/60 hover:text-white hover:bg-white/10 transition-all cursor-pointer flex items-center justify-center"
+                                  title="Editar Usuário"
+                                >
+                                  <Edit3 size={14} />
+                                </button>
+                                <button
+                                  onClick={() => handleDeleteUser(u.uid, u.email)}
+                                  className="p-2 rounded-xl bg-rose-500/5 border border-rose-500/10 text-rose-400 hover:text-rose-300 hover:bg-rose-500/15 transition-all cursor-pointer flex items-center justify-center"
+                                  title="Excluir Usuário"
+                                >
+                                  <Trash2 size={14} />
+                                </button>
+                              </div>
+                            </td>
+                          </motion.tr>
+                        );
+                      })}
+
+                    {usersList.length === 0 && (
+                      <tr>
+                        <td colSpan={4} className="text-center py-12 text-white/20 font-bold uppercase tracking-widest text-[10px]">
+                          Carregando ou nenhum usuário encontrado.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {/* User Create/Edit Modal */}
+            {isUserModalOpen && (
+              <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+                <motion.div 
+                  initial={{ opacity: 0, scale: 0.95 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  className="bg-[#111317] border border-white/10 rounded-[2.5rem] p-8 w-full max-w-md relative shadow-2xl"
+                >
+                  <button 
+                    onClick={() => {
+                      setIsUserModalOpen(false);
+                      setEditingUser(null);
+                    }}
+                    className="absolute top-6 right-6 text-white/40 hover:text-white transition-all cursor-pointer"
+                  >
+                    <X size={18} />
+                  </button>
+
+                  <h3 className="text-xl font-black text-white italic uppercase tracking-tighter mb-1">
+                    {editingUser ? 'Editar Usuário' : 'Novo Usuário'}
+                  </h3>
+                  <p className="text-white/40 text-[10px] font-black uppercase tracking-widest mb-6">
+                    {editingUser ? 'Atualize as credenciais e nível do usuário' : 'Crie um novo acesso administrativo ou regular'}
+                  </p>
+
+                  <form onSubmit={handleSaveUser} className="space-y-4">
+                    <div>
+                      <label className="block text-[10px] font-black text-white/30 uppercase tracking-widest mb-1.5 px-1">Nome Completo</label>
+                      <input
+                        type="text"
+                        required
+                        value={userForm.displayName}
+                        onChange={(e) => setUserForm(prev => ({ ...prev, displayName: e.target.value }))}
+                        className="block w-full px-4 py-3 bg-white/[0.03] border border-white/10 rounded-2xl text-white text-xs font-semibold focus:outline-none focus:border-brand-orange transition-all"
+                        placeholder="Nome do usuário"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-[10px] font-black text-white/30 uppercase tracking-widest mb-1.5 px-1">E-mail</label>
+                      <input
+                        type="email"
+                        required
+                        value={userForm.email}
+                        onChange={(e) => setUserForm(prev => ({ ...prev, email: e.target.value }))}
+                        className="block w-full px-4 py-3 bg-white/[0.03] border border-white/10 rounded-2xl text-white text-xs font-semibold focus:outline-none focus:border-brand-orange transition-all"
+                        placeholder="email@exemplo.com"
+                      />
+                    </div>
+
+                    {!editingUser && (
+                      <div>
+                        <label className="block text-[10px] font-black text-white/30 uppercase tracking-widest mb-1.5 px-1">Senha</label>
+                        <input
+                          type="password"
+                          required
+                          value={userForm.password}
+                          onChange={(e) => setUserForm(prev => ({ ...prev, password: e.target.value }))}
+                          className="block w-full px-4 py-3 bg-white/[0.03] border border-white/10 rounded-2xl text-white text-xs font-semibold focus:outline-none focus:border-brand-orange transition-all"
+                          placeholder="Mínimo 3 caracteres"
+                        />
+                      </div>
+                    )}
+
+                    <div>
+                      <label className="block text-[10px] font-black text-white/30 uppercase tracking-widest mb-1.5 px-1">Nível de Acesso</label>
+                      <div className="grid grid-cols-3 gap-2 mt-1">
+                        {[
+                          { id: 'cliente', label: 'Cliente' },
+                          { id: 'empresa', label: 'Empresa' },
+                          { id: 'admin', label: 'Admin' }
+                        ].map(opt => (
+                          <button
+                            key={opt.id}
+                            type="button"
+                            onClick={() => setUserForm(prev => ({ ...prev, role: opt.id as any }))}
+                            className={`py-3 rounded-2xl border text-[9px] font-black uppercase tracking-widest transition-all ${
+                              userForm.role === opt.id
+                                ? 'bg-brand-orange/15 border-brand-orange text-brand-orange font-bold'
+                                : 'bg-white/[0.02] border-white/5 text-white/40 hover:text-white'
+                            }`}
+                          >
+                            {opt.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    <button
+                      type="submit"
+                      className="w-full mt-6 py-4 bg-brand-orange text-white font-black uppercase tracking-widest text-[10px] rounded-2xl shadow-xl shadow-brand-orange/15 cursor-pointer hover:bg-brand-orange/90 transition-all font-bold"
+                    >
+                      {editingUser ? 'Salvar Alterações' : 'Cadastrar Usuário'}
+                    </button>
+                  </form>
+                </motion.div>
+              </div>
+            )}
           </motion.div>
         )}
 

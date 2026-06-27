@@ -14,7 +14,7 @@ export interface User {
   uid: string;
   email: string;
   displayName: string;
-  role: 'admin' | 'user';
+  role: 'admin' | 'cliente' | 'empresa' | 'user';
 }
 
 export function useAuth() {
@@ -37,7 +37,7 @@ export function useAuth() {
           const userDocRef = doc(db, 'users', firebaseUser.uid);
           const userSnap = await getDoc(userDocRef);
           
-          let role: 'admin' | 'user' = 'user';
+          let role: 'admin' | 'cliente' | 'empresa' | 'user' = 'cliente';
           const email = firebaseUser.email || '';
 
           // Determine initial default role
@@ -101,7 +101,7 @@ export function useAuth() {
       const firebaseUser = result.user;
       
       const email = firebaseUser.email || '';
-      let role: 'admin' | 'user' = 'user';
+      let role: 'admin' | 'cliente' | 'empresa' | 'user' = 'cliente';
       if (email.toLowerCase().includes('admin') || email === 'joao@exemplo.com' || email === 'aplicativo.vaptmarket@gmail.com') {
         role = 'admin';
       }
@@ -151,7 +151,7 @@ export function useAuth() {
       const userDocRef = doc(db, 'users', firebaseUser.uid);
       const userSnap = await getDoc(userDocRef);
       
-      let role: 'admin' | 'user' = 'user';
+      let role: 'admin' | 'cliente' | 'empresa' | 'user' = 'cliente';
       if (targetEmail.includes('admin') || targetEmail === 'joao@exemplo.com' || targetEmail === 'aplicativo.vaptmarket@gmail.com') {
         role = 'admin';
       }
@@ -197,7 +197,7 @@ export function useAuth() {
     }
   };
 
-  const registerWithEmail = async (name: string, email: string, password?: string): Promise<User> => {
+  const registerWithEmail = async (name: string, email: string, password?: string, chosenRole: 'cliente' | 'empresa' = 'cliente'): Promise<User> => {
     const targetEmail = email.trim().toLowerCase();
     const targetName = name.trim();
     const targetPassword = password || '123';
@@ -214,7 +214,7 @@ export function useAuth() {
         displayName: targetName
       });
 
-      let role: 'admin' | 'user' = 'user';
+      let role: 'admin' | 'cliente' | 'empresa' | 'user' = chosenRole;
       if (targetEmail.includes('admin') || targetEmail === 'joao@exemplo.com' || targetEmail === 'aplicativo.vaptmarket@gmail.com') {
         role = 'admin';
       }
