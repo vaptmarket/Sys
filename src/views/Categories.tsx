@@ -93,8 +93,8 @@ export default function Categories() {
         animate={{ opacity: 1, y: 0 }}
         className="mb-10"
       >
-        <h1 className="text-3xl md:text-4xl font-black font-display text-white mb-2">Explore Categorias</h1>
-        <p className="text-white/40 font-semibold uppercase tracking-widest text-[10px]">Encontre o que você precisa através de demonstrações reais</p>
+        <h1 className="text-3xl md:text-4xl font-black font-display text-white mb-2">Explore Canais</h1>
+        <p className="text-white/40 font-semibold uppercase tracking-widest text-[10px]">Canais de Divulgação Associados à Categoria de Cada Empresa Parceira</p>
       </motion.header>
 
       {isLoading ? (

@@ -71,17 +71,28 @@ export default function Search() {
 
   // Load persisted location
   React.useEffect(() => {
-    const savedCoords = localStorage.getItem('vapt_user_coords');
-    if (savedCoords) {
-      try {
-        const coords = JSON.parse(savedCoords);
-        setUserCoords(coords);
-        setSelectedCategory('Próximos');
-        setSortBy('distance');
-      } catch (e) {
-        console.error("Erro ao ler localização salva:", e);
+    const loadSavedLocation = () => {
+      const savedCoords = localStorage.getItem('vapt_user_coords');
+      if (savedCoords) {
+        try {
+          const coords = JSON.parse(savedCoords);
+          setUserCoords(coords);
+          setSelectedCategory('Próximos');
+          setSortBy('distance');
+        } catch (e) {
+          console.error("Erro ao ler localização salva:", e);
+        }
+      } else {
+        setUserCoords(null);
       }
-    }
+    };
+
+    loadSavedLocation();
+
+    window.addEventListener('vapt_location_updated', loadSavedLocation);
+    return () => {
+      window.removeEventListener('vapt_location_updated', loadSavedLocation);
+    };
   }, []);
 
   React.useEffect(() => {

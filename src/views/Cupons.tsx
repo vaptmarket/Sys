@@ -5,6 +5,7 @@ import { motion } from 'motion/react';
 import { Ticket, Copy, Check, Tag, Info, ShoppingBag, QrCode } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { Link } from 'react-router-dom';
+import { safeFormatDate } from '../utils/date';
 import QrCodeModal from '../components/QrCodeModal';
 
 export default function Cupons() {
@@ -29,7 +30,7 @@ export default function Cupons() {
           companyService.getAll()
         ]);
         if (!active) return;
-        setCoupons(allCoupons);
+        setCoupons(allCoupons.filter(c => c.active !== false));
         setCompanies(allCompanies);
       } catch (error) {
         console.error("Erro ao carregar dados da central de cupons:", error);
@@ -163,7 +164,7 @@ export default function Cupons() {
                 <div className="flex items-center justify-between text-[10px] font-bold uppercase tracking-widest text-white/30">
                    <div className="flex items-center gap-1.5">
                      <Tag size={12} />
-                     Expira em {new Date(coupon.expiresAt).toLocaleDateString()}
+                     Expira em {safeFormatDate(coupon.expiresAt)}
                    </div>
                    <div className="flex items-center gap-1.5">
                      <ShoppingBag size={12} />

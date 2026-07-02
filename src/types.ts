@@ -18,6 +18,7 @@ export type Category =
 export interface Company {
   id: string;
   userId?: string;
+  referredBy?: string;
   name: string;
   description: string;
   logo: string;
@@ -51,6 +52,7 @@ export interface Coupon {
   expiresAt: string;
   usageLimit?: number;
   usedCount: number;
+  active?: boolean;
 }
 
 export interface Ad {
@@ -112,3 +114,28 @@ export interface AppNotification {
   unread: boolean;
   type: 'coupon' | 'approval' | 'chat';
 }
+
+export interface Sale {
+  id: string;
+  affiliateId: string;
+  affiliateName: string;
+  companyId: string;
+  companyName: string;
+  saleValue: number;
+  bonusPercent: number;
+  bonusValue: number;
+  status: 'Pendente' | 'Aguardando Pagamento' | 'Finalizada';
+  createdAt: number;
+}
+
+export interface WithdrawRequest {
+  id: string;
+  userId: string;
+  userName: string;
+  userEmail: string;
+  pixKey: string;
+  amount: number;
+  status: 'Pendente' | 'Aprovado' | 'Recusado';
+  createdAt: number;
+}
+

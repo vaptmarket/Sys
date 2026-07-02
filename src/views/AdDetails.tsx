@@ -1,5 +1,6 @@
 import React from 'react';
 import { useParams, Link } from 'react-router-dom';
+import { safeFormatDate } from '../utils/date';
 import { adService, companyService, couponService } from '../services/mockFirebase';
 import { Ad, Company, Coupon } from '../types';
 import { 
@@ -104,7 +105,7 @@ export default function AdDetails() {
           // Get coupons of this company
           try {
             const allCoupons = await couponService.getAll();
-            const filteredCoupons = allCoupons.filter(c => c.companyId === foundAd.companyId);
+            const filteredCoupons = allCoupons.filter(c => c.companyId === foundAd.companyId && c.active !== false);
             if (active) {
               setCoupons(filteredCoupons);
             }
@@ -435,7 +436,7 @@ export default function AdDetails() {
                               {coupon.discountValue} Off
                             </span>
                             <span className="text-[9px] font-bold text-white/40 uppercase">
-                              Expira em: {new Date(coupon.expiresAt).toLocaleDateString('pt-BR')}
+                              Expira em: {safeFormatDate(coupon.expiresAt)}
                             </span>
                           </div>
                           <h4 className="text-sm font-black text-white italic uppercase mb-1">{coupon.code}</h4>

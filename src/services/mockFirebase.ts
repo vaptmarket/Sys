@@ -1,4 +1,4 @@
-import { Ad, Category, Company, UserSaved, UserCoupon, Coupon, AppNotification } from '../types';
+import { Ad, Category, Company, UserSaved, UserCoupon, Coupon, AppNotification, Sale, WithdrawRequest } from '../types';
 import { MOCK_ADS, MOCK_CATEGORIES, MOCK_COMPANIES, MOCK_COUPONS } from '../constants/mocks';
 import { 
   collection, 
@@ -110,13 +110,16 @@ const getStoredData = () => {
     coupons: MOCK_COUPONS,
     userSaves: [] as UserSaved[],
     userCoupons: [] as UserCoupon[],
+    sales: [] as Sale[],
+    withdrawals: [] as WithdrawRequest[],
     notifications: [
       { id: 'n1', title: 'Oferta Relâmpago ⚡', message: 'Restaurante Sabor & Arte lançou um cupom de 50%!', createdAt: Date.now() - 120000, unread: true, type: 'coupon' },
       { id: 'n2', title: 'Anúncio Aprovado ✅', message: 'Seu anúncio "iPhone 15 Pro Max" já está no ar.', createdAt: Date.now() - 3600000, unread: true, type: 'approval' },
       { id: 'n3', title: 'Nova Mensagem 💬', message: 'Você recebeu uma pergunta sobre o Console Retro.', createdAt: Date.now() - 10800000, unread: false, type: 'chat' },
     ] as AppNotification[],
     settings: {
-      platformWhatsapp: 'https://wa.me/5527992830151'
+      platformWhatsapp: 'https://wa.me/5527992830151',
+      companyReferralBonusPercent: 10
     }
   };
   const stored = localStorage.getItem(STORAGE_KEY);
@@ -130,6 +133,8 @@ const getStoredData = () => {
         coupons: uniqueById<Coupon>(parsed.coupons || defaultData.coupons),
         userSaves: parsed.userSaves || defaultData.userSaves,
         userCoupons: uniqueById<UserCoupon>(parsed.userCoupons || defaultData.userCoupons),
+        sales: parsed.sales || defaultData.sales,
+        withdrawals: parsed.withdrawals || defaultData.withdrawals,
         notifications: parsed.notifications || defaultData.notifications,
         settings: parsed.settings || defaultData.settings,
       };
@@ -150,6 +155,19 @@ const saveStoredData = (data: any) => {
 };
 
 let currentData = getStoredData();
+
+const cleanObject = (obj: any): any => {
+  if (!obj || typeof obj !== 'object') return obj;
+  const result = { ...obj };
+  Object.keys(result).forEach(key => {
+    if (result[key] === undefined) {
+      delete result[key];
+    } else if (result[key] !== null && typeof result[key] === 'object') {
+      result[key] = cleanObject(result[key]);
+    }
+  });
+  return result;
+};
 
 // Firestore background initialization & seed helper
 const seedCollection = async <T extends { id: string }>(colName: string, defaultData: T[]) => {
@@ -691,26 +709,30 @@ export const companyService = {
   },
 
   async create(companyData: Partial<Company>): Promise<string> {
-    const newId = companyData.id || Math.random().toString(36).substr(2, 9);
+    const newId = (!companyData.id || companyData.id === 'nova') ? Math.random().toString(36).substr(2, 9) : companyData.id;
+    const referredBy = companyData.referredBy || localStorage.getItem('vapt_referral_affiliate_id') || undefined;
     const newCompany = {
       ...companyData,
       id: newId,
+      referredBy,
       status: companyData.status || 'pending',
       verified: companyData.verified || false,
       logo: companyData.logo || 'https://images.unsplash.com/photo-1560179707-f14e90ef3623?auto=format&fit=crop&w=100&q=80',
     } as Company;
 
+    const cleanedCompany = cleanObject(newCompany);
+
     try {
-      await setDoc(doc(db, 'companies', newId), newCompany);
+      await setDoc(doc(db, 'companies', newId), cleanedCompany);
     } catch (e) {
       console.error('Firestore company.create failed:', e);
     }
 
     const index = currentData.companies.findIndex((c: Company) => c.id === newId);
     if (index > -1) {
-      currentData.companies[index] = { ...currentData.companies[index], ...newCompany } as Company;
+      currentData.companies[index] = { ...currentData.companies[index], ...cleanedCompany } as Company;
     } else {
-      currentData.companies.push(newCompany);
+      currentData.companies.push(cleanedCompany);
     }
     saveStoredData(currentData);
     return newId;
@@ -997,31 +1019,197 @@ export const notificationService = {
 };
 
 export const settingsService = {
-  async getSettings(): Promise<{ platformWhatsapp: string }> {
+  async getSettings(): Promise<{ platformWhatsapp: string; companyReferralBonusPercent: number }> {
     try {
       const snap = await getDoc(doc(db, 'settings', 'global'));
       if (snap.exists()) {
-        return snap.data() as { platformWhatsapp: string };
+        const data = snap.data();
+        return {
+          platformWhatsapp: data.platformWhatsapp || 'https://wa.me/5527992830151',
+          companyReferralBonusPercent: data.companyReferralBonusPercent !== undefined ? data.companyReferralBonusPercent : 10
+        };
       }
-      const defaultSettings = { platformWhatsapp: 'https://wa.me/5527992830151' };
+      const defaultSettings = { platformWhatsapp: 'https://wa.me/5527992830151', companyReferralBonusPercent: 10 };
       await setDoc(doc(db, 'settings', 'global'), defaultSettings);
       return defaultSettings;
     } catch (e) {
       if (!currentData.settings) {
-        currentData.settings = { platformWhatsapp: 'https://wa.me/5527992830151' };
+        currentData.settings = { platformWhatsapp: 'https://wa.me/5527992830151', companyReferralBonusPercent: 10 };
       }
-      return { ...currentData.settings };
+      return { 
+        platformWhatsapp: currentData.settings.platformWhatsapp || 'https://wa.me/5527992830151',
+        companyReferralBonusPercent: currentData.settings.companyReferralBonusPercent !== undefined ? currentData.settings.companyReferralBonusPercent : 10
+      };
     }
   },
 
-  async updateSettings(settings: { platformWhatsapp: string }): Promise<void> {
+  async updateSettings(settings: { platformWhatsapp: string; companyReferralBonusPercent?: number }): Promise<void> {
     try {
       await setDoc(doc(db, 'settings', 'global'), settings, { merge: true });
     } catch (e) {
       console.error('Firestore settings.updateSettings failed:', e);
     }
-    currentData.settings = { ...settings };
+    currentData.settings = { ...currentData.settings, ...settings };
     saveStoredData(currentData);
     events.emit('settings_updated', currentData.settings);
+  }
+};
+
+export const salesService = {
+  async getAll(): Promise<Sale[]> {
+    try {
+      const snap = await getDocs(collection(db, 'sales'));
+      const sales: Sale[] = [];
+      snap.forEach(d => {
+        sales.push({ id: d.id, ...d.data() } as Sale);
+      });
+      return sales.sort((a, b) => b.createdAt - a.createdAt);
+    } catch (e) {
+      if (!currentData.sales) currentData.sales = [];
+      return [...currentData.sales].sort((a, b) => b.createdAt - a.createdAt);
+    }
+  },
+
+  async getByAffiliateId(affiliateId: string): Promise<Sale[]> {
+    try {
+      const q = query(collection(db, 'sales'), where('affiliateId', '==', affiliateId));
+      const snap = await getDocs(q);
+      const sales: Sale[] = [];
+      snap.forEach(d => {
+        sales.push({ id: d.id, ...d.data() } as Sale);
+      });
+      return sales.sort((a, b) => b.createdAt - a.createdAt);
+    } catch (e) {
+      if (!currentData.sales) currentData.sales = [];
+      return currentData.sales.filter((s: Sale) => s.affiliateId === affiliateId).sort((a, b) => b.createdAt - a.createdAt);
+    }
+  },
+
+  async create(saleData: Partial<Sale>): Promise<string> {
+    const newId = saleData.id || 'sale_' + Math.random().toString(36).substr(2, 9);
+    const newSale = {
+      ...saleData,
+      id: newId,
+      createdAt: saleData.createdAt || Date.now(),
+      status: saleData.status || 'Pendente'
+    } as Sale;
+
+    try {
+      await setDoc(doc(db, 'sales', newId), newSale);
+    } catch (e) {
+      console.error('Firestore salesService.create failed:', e);
+    }
+
+    if (!currentData.sales) currentData.sales = [];
+    const index = currentData.sales.findIndex((s: Sale) => s.id === newId);
+    if (index > -1) {
+      currentData.sales[index] = { ...currentData.sales[index], ...newSale } as Sale;
+    } else {
+      currentData.sales.push(newSale);
+    }
+    saveStoredData(currentData);
+    return newId;
+  },
+
+  async updateStatus(id: string, status: 'Pendente' | 'Aguardando Pagamento' | 'Finalizada'): Promise<void> {
+    try {
+      await updateDoc(doc(db, 'sales', id), { status });
+    } catch (e) {
+      console.error('Firestore salesService.updateStatus failed:', e);
+    }
+
+    if (!currentData.sales) currentData.sales = [];
+    const sale = currentData.sales.find((s: Sale) => s.id === id);
+    if (sale) {
+      sale.status = status;
+      saveStoredData(currentData);
+    }
+  },
+
+  async delete(id: string): Promise<void> {
+    try {
+      await deleteDoc(doc(db, 'sales', id));
+    } catch (e) {
+      console.error('Firestore salesService.delete failed:', e);
+    }
+
+    if (!currentData.sales) currentData.sales = [];
+    const index = currentData.sales.findIndex((s: Sale) => s.id === id);
+    if (index > -1) {
+      currentData.sales.splice(index, 1);
+      saveStoredData(currentData);
+    }
+  }
+};
+
+export const withdrawService = {
+  async getAll(): Promise<WithdrawRequest[]> {
+    try {
+      const snap = await getDocs(collection(db, 'withdrawals'));
+      const list: WithdrawRequest[] = [];
+      snap.forEach(d => {
+        list.push({ id: d.id, ...d.data() } as WithdrawRequest);
+      });
+      return list.sort((a, b) => b.createdAt - a.createdAt);
+    } catch (e) {
+      if (!currentData.withdrawals) currentData.withdrawals = [];
+      return [...currentData.withdrawals].sort((a, b) => b.createdAt - a.createdAt);
+    }
+  },
+
+  async getByUserId(userId: string): Promise<WithdrawRequest[]> {
+    try {
+      const q = query(collection(db, 'withdrawals'), where('userId', '==', userId));
+      const snap = await getDocs(q);
+      const list: WithdrawRequest[] = [];
+      snap.forEach(d => {
+        list.push({ id: d.id, ...d.data() } as WithdrawRequest);
+      });
+      return list.sort((a, b) => b.createdAt - a.createdAt);
+    } catch (e) {
+      if (!currentData.withdrawals) currentData.withdrawals = [];
+      return currentData.withdrawals.filter((w: WithdrawRequest) => w.userId === userId).sort((a, b) => b.createdAt - a.createdAt);
+    }
+  },
+
+  async create(data: Partial<WithdrawRequest>): Promise<string> {
+    const newId = data.id || 'withdraw_' + Math.random().toString(36).substr(2, 9);
+    const newRequest = {
+      ...data,
+      id: newId,
+      createdAt: data.createdAt || Date.now(),
+      status: data.status || 'Pendente'
+    } as WithdrawRequest;
+
+    try {
+      await setDoc(doc(db, 'withdrawals', newId), newRequest);
+    } catch (e) {
+      console.error('Firestore withdrawService.create failed:', e);
+    }
+
+    if (!currentData.withdrawals) currentData.withdrawals = [];
+    const index = currentData.withdrawals.findIndex((w: WithdrawRequest) => w.id === newId);
+    if (index > -1) {
+      currentData.withdrawals[index] = { ...currentData.withdrawals[index], ...newRequest } as WithdrawRequest;
+    } else {
+      currentData.withdrawals.push(newRequest);
+    }
+    saveStoredData(currentData);
+    return newId;
+  },
+
+  async updateStatus(id: string, status: 'Pendente' | 'Aprovado' | 'Recusado'): Promise<void> {
+    try {
+      await updateDoc(doc(db, 'withdrawals', id), { status });
+    } catch (e) {
+      console.error('Firestore withdrawService.updateStatus failed:', e);
+    }
+
+    if (!currentData.withdrawals) currentData.withdrawals = [];
+    const request = currentData.withdrawals.find((w: WithdrawRequest) => w.id === id);
+    if (request) {
+      request.status = status;
+      saveStoredData(currentData);
+    }
   }
 };

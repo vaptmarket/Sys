@@ -48,10 +48,12 @@ import { cn } from '../lib/utils';
 import AdEditor from '../components/AdEditor';
 import ModerationCard from '../components/ModerationCard';
 import CompanyEditor from '../components/CompanyEditor';
-import { Ad, Category, Company, Coupon } from '../types';
-import { adService, categoryService, companyService, couponService, settingsService, notificationService, events } from '../services/mockFirebase';
+import CouponEditor from '../components/CouponEditor';
+import { Ad, Category, Company, Coupon, Sale, WithdrawRequest } from '../types';
+import { adService, categoryService, companyService, couponService, settingsService, notificationService, salesService, events, withdrawService } from '../services/mockFirebase';
 import toast from 'react-hot-toast';
 import ConfirmationModal from '../components/ConfirmationModal';
+import { safeFormatDate } from '../utils/date';
 
 const ICON_MAP: Record<string, any> = {
   Utensils,
@@ -94,7 +96,7 @@ const CATEGORY_ICONS_LIST = [
 ];
 
 export default function Admin() {
-  const [activeTab, setActiveTab] = React.useState<'ads' | 'moderation' | 'categories' | 'companies' | 'settings' | 'users'>('ads');
+  const [activeTab, setActiveTab] = React.useState<'ads' | 'moderation' | 'categories' | 'companies' | 'settings' | 'users' | 'affiliates' | 'coupons'>('ads');
   const [ads, setAds] = React.useState<Ad[]>([]);
   const [categories, setCategories] = React.useState<{ id: string; name: Category | string; icon: string; imageUrl?: string; disabled?: boolean }[]>([]);
   const [coupons, setCoupons] = React.useState<Coupon[]>([]);
@@ -105,6 +107,16 @@ export default function Admin() {
   const [newCatIcon, setNewCatIcon] = React.useState('Tag');
   const [newCatImageUrl, setNewCatImageUrl] = React.useState('');
   const [isDraggingCreate, setIsDraggingCreate] = React.useState(false);
+
+  // Affiliate & Sales state variables
+  const [sales, setSales] = React.useState<Sale[]>([]);
+  const [withdraws, setWithdraws] = React.useState<WithdrawRequest[]>([]);
+  const [bonusPercent, setBonusPercent] = React.useState<number>(10);
+  const [isSavingAffiliateSettings, setIsSavingAffiliateSettings] = React.useState(false);
+  const [newSaleAffiliateId, setNewSaleAffiliateId] = React.useState('');
+  const [newSaleCompanyId, setNewSaleCompanyId] = React.useState('');
+  const [newSaleValue, setNewSaleValue] = React.useState('');
+  const [newSaleStatus, setNewSaleStatus] = React.useState<'Pendente' | 'Aguardando Pagamento' | 'Finalizada'>('Pendente');
 
   // Editing state for categories
   const [editingCatId, setEditingCatId] = React.useState<string | null>(null);
@@ -117,6 +129,7 @@ export default function Admin() {
   const [pendingCompanies, setPendingCompanies] = React.useState<Company[]>([]);
   const [allCompanies, setAllCompanies] = React.useState<Company[]>([]);
   const [editingCompany, setEditingCompany] = React.useState<Company | null>(null);
+  const [editingCoupon, setEditingCoupon] = React.useState<Coupon | null>(null);
   const [statusFilter, setStatusFilter] = React.useState<'all' | 'active' | 'pending' | 'rejected'>('all');
   const [companyStatusFilter, setCompanyStatusFilter] = React.useState<'all' | 'active' | 'pending' | 'rejected'>('all');
 
@@ -288,10 +301,141 @@ export default function Admin() {
     });
   };
 
+  const fetchSales = async () => {
+    try {
+      const data = await salesService.getAll();
+      setSales(data);
+    } catch (e) {
+      console.error('Error fetching sales:', e);
+    }
+  };
+
+  const fetchWithdraws = async () => {
+    try {
+      const data = await withdrawService.getAll();
+      setWithdraws(data);
+    } catch (e) {
+      console.error('Error fetching withdraws:', e);
+    }
+  };
+
+  const handleUpdateWithdrawStatus = async (id: string, status: 'Pendente' | 'Aprovado' | 'Recusado') => {
+    try {
+      await withdrawService.updateStatus(id, status);
+      toast.success(`Status da solicitação atualizado para: ${status}!`);
+      await fetchWithdraws();
+    } catch (err) {
+      console.error('Error updating withdraw status:', err);
+      toast.error('Erro ao atualizar status da solicitação.');
+    }
+  };
+
+  const handleSaveAffiliateSettings = async (percent: number) => {
+    setIsSavingAffiliateSettings(true);
+    try {
+      await settingsService.updateSettings({ 
+        platformWhatsapp, 
+        companyReferralBonusPercent: percent 
+      });
+      setBonusPercent(percent);
+      toast.success('Percentual de bônus atualizado com sucesso!');
+    } catch (err: any) {
+      toast.error(err?.message || 'Erro ao atualizar percentual de bônus.');
+    } finally {
+      setIsSavingAffiliateSettings(false);
+    }
+  };
+
+  const handleAddSale = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newSaleAffiliateId) {
+      toast.error('Selecione um afiliado!');
+      return;
+    }
+    if (!newSaleCompanyId) {
+      toast.error('Selecione a empresa indicada!');
+      return;
+    }
+    const val = parseFloat(newSaleValue);
+    if (isNaN(val) || val <= 0) {
+      toast.error('Informe um valor de venda válido!');
+      return;
+    }
+
+    const affiliate = usersList.find(u => u.uid === newSaleAffiliateId || u.id === newSaleAffiliateId);
+    const company = allCompanies.find(c => c.id === newSaleCompanyId);
+
+    if (!affiliate) {
+      toast.error('Afiliado não encontrado!');
+      return;
+    }
+    if (!company) {
+      toast.error('Empresa não encontrada!');
+      return;
+    }
+
+    const calculatedBonus = parseFloat((val * (bonusPercent / 100)).toFixed(2));
+
+    try {
+      await salesService.create({
+        affiliateId: affiliate.uid || affiliate.id,
+        affiliateName: affiliate.displayName || affiliate.name || 'Afiliado',
+        companyId: company.id,
+        companyName: company.name,
+        saleValue: val,
+        bonusPercent: bonusPercent,
+        bonusValue: calculatedBonus,
+        status: newSaleStatus,
+        createdAt: Date.now()
+      });
+      toast.success('Venda adicionada com sucesso!');
+      setNewSaleValue('');
+      setNewSaleAffiliateId('');
+      setNewSaleCompanyId('');
+      setNewSaleStatus('Pendente');
+      fetchSales();
+    } catch (err: any) {
+      toast.error('Erro ao adicionar venda.');
+    }
+  };
+
+  const handleUpdateSaleStatus = async (saleId: string, status: 'Pendente' | 'Aguardando Pagamento' | 'Finalizada') => {
+    try {
+      await salesService.updateStatus(saleId, status);
+      toast.success('Status da venda atualizado!');
+      fetchSales();
+    } catch (err) {
+      toast.error('Erro ao atualizar status.');
+    }
+  };
+
+  const handleDeleteSale = async (saleId: string) => {
+    setConfirmModal({
+      isOpen: true,
+      title: 'Excluir Venda',
+      message: 'Tem certeza que deseja excluir este registro de venda?',
+      variant: 'danger',
+      onConfirm: async () => {
+        try {
+          await salesService.delete(saleId);
+          toast.success('Registro de venda removido!');
+          fetchSales();
+        } catch (err) {
+          toast.error('Erro ao remover venda.');
+        } finally {
+          setConfirmModal(prev => ({ ...prev, isOpen: false }));
+        }
+      }
+    });
+  };
+
   React.useEffect(() => {
     settingsService.getSettings().then(s => {
       setPlatformWhatsapp(s.platformWhatsapp);
+      setBonusPercent(s.companyReferralBonusPercent !== undefined ? s.companyReferralBonusPercent : 10);
     });
+    fetchSales();
+    fetchWithdraws();
   }, []);
 
   const handleSaveSettings = async (e: React.FormEvent) => {
@@ -785,14 +929,83 @@ export default function Admin() {
   const handleSaveCompany = async (companyData: Company) => {
     const loadId = toast.loading('Salvando empresa...');
     try {
+      const isNew = !companyData.id || companyData.id === 'nova' || !allCompanies.some(c => c.id === companyData.id);
       const id = await companyService.create(companyData);
-      setAllCompanies(prev => prev.map(c => c.id === companyData.id ? { ...companyData, id } : c));
-      setPendingCompanies(prev => prev.map(c => c.id === companyData.id ? { ...companyData, id } : c));
-      toast.success('Empresa atualizada com sucesso!', { id: loadId });
+      const finalCompany = { ...companyData, id };
+
+      if (isNew) {
+        setAllCompanies(prev => [finalCompany, ...prev]);
+        if (finalCompany.status === 'pending') {
+          setPendingCompanies(prev => [finalCompany, ...prev]);
+        }
+      } else {
+        setAllCompanies(prev => prev.map(c => c.id === companyData.id ? finalCompany : c));
+        setPendingCompanies(prev => prev.map(c => c.id === companyData.id ? finalCompany : c));
+      }
+
+      toast.success(isNew ? 'Empresa adicionada com sucesso!' : 'Empresa atualizada com sucesso!', { id: loadId });
       setEditingCompany(null);
     } catch (error: any) {
       console.error('Error saving company:', error);
       toast.error(error?.message || 'Ocorreu um erro ao salvar as informações localmente. Verifique o limite de armazenamento do navegador!', { id: loadId });
+    }
+  };
+
+  const handleSaveCoupon = async (couponData: Coupon) => {
+    const loadId = toast.loading('Salvando cupom...');
+    try {
+      const isNew = !couponData.id || couponData.id === 'novo' || !coupons.some(c => c.id === couponData.id);
+      const id = await couponService.create(couponData);
+      const finalCoupon = { ...couponData, id };
+
+      if (isNew) {
+        setCoupons(prev => [finalCoupon, ...prev]);
+      } else {
+        setCoupons(prev => prev.map(c => c.id === couponData.id ? finalCoupon : c));
+      }
+
+      toast.success(isNew ? 'Cupom adicionado com sucesso!' : 'Cupom atualizado com sucesso!', { id: loadId });
+      setEditingCoupon(null);
+    } catch (error: any) {
+      console.error('Error saving coupon:', error);
+      toast.error(error?.message || 'Erro ao salvar cupom.', { id: loadId });
+    }
+  };
+
+  const handleDeleteCoupon = (id: string) => {
+    setConfirmModal({
+      isOpen: true,
+      title: 'Excluir Cupom',
+      message: 'Tem certeza que deseja excluir permanentemente este cupom? Esta ação não pode ser desfeita.',
+      variant: 'danger',
+      onConfirm: async () => {
+        const loadId = toast.loading('Excluindo cupom...');
+        try {
+          await couponService.delete(id);
+          setCoupons(prev => prev.filter(c => c.id !== id));
+          toast.success('Cupom excluído com sucesso!', { id: loadId });
+          setConfirmModal(prev => ({ ...prev, isOpen: false }));
+        } catch (error: any) {
+          console.error('Error deleting coupon:', error);
+          toast.error(error?.message || 'Erro ao excluir o cupom.', { id: loadId });
+        }
+      }
+    });
+  };
+
+  const handleToggleCouponStatus = async (coupon: Coupon) => {
+    const loadId = toast.loading(coupon.active === false ? 'Ativando cupom...' : 'Desativando cupom...');
+    try {
+      const updatedCoupon = {
+        ...coupon,
+        active: coupon.active === false
+      };
+      await couponService.create(updatedCoupon);
+      setCoupons(prev => prev.map(c => c.id === coupon.id ? updatedCoupon : c));
+      toast.success(updatedCoupon.active ? 'Cupom ativado com sucesso!' : 'Cupom desativado com sucesso!', { id: loadId });
+    } catch (error: any) {
+      console.error('Error toggling coupon status:', error);
+      toast.error(error?.message || 'Erro ao alterar status do cupom.', { id: loadId });
     }
   };
 
@@ -827,8 +1040,10 @@ export default function Admin() {
           { id: 'ads', label: 'Anúncios', icon: Video },
           { id: 'moderation', label: 'Moderação', icon: CheckCircle },
           { id: 'companies', label: 'Empresas', icon: Store },
-          { id: 'categories', label: 'Categorias', icon: Tag },
+          { id: 'categories', label: 'Canais (Categorias)', icon: Tag },
+          { id: 'coupons', label: 'Cupons', icon: Ticket },
           { id: 'users', label: 'Usuários', icon: Users },
+          { id: 'affiliates', label: 'Afiliados', icon: TrendingUp },
           { id: 'settings', label: 'Ajustes', icon: Settings },
         ].map(tab => (
           <button
@@ -1023,11 +1238,11 @@ export default function Admin() {
                         <span className="text-[10px] font-bold text-white/40">
                           {ad.startDate && ad.startDate.split('-').length === 3 
                             ? `${ad.startDate.split('-')[2]}/${ad.startDate.split('-')[1]}/${ad.startDate.split('-')[0]}` 
-                            : new Date(ad.createdAt || Date.now()).toLocaleDateString('pt-BR')}
+                            : safeFormatDate(ad.createdAt || Date.now())}
                         </span>
                       </td>
                       <td className="px-4 py-6">
-                        <span className="text-[10px] font-bold text-white/40">{new Date(ad.expiresAt).toLocaleDateString('pt-BR')}</span>
+                        <span className="text-[10px] font-bold text-white/40">{safeFormatDate(ad.expiresAt)}</span>
                       </td>
                       <td className="px-4 py-6 text-right">
                         <div className="flex items-center justify-end gap-2">
@@ -1556,6 +1771,26 @@ export default function Admin() {
                   ))}
                 </div>
               </div>
+              <button
+                onClick={() => setEditingCompany({
+                  id: 'nova',
+                  name: '',
+                  logo: 'https://images.unsplash.com/photo-1560179707-f14e90ef3623?auto=format&fit=crop&w=100&q=80',
+                  description: '',
+                  phone: '',
+                  whatsapp: '',
+                  website: '',
+                  instagram: '',
+                  address: '',
+                  hours: '',
+                  status: 'active',
+                  verified: false
+                })}
+                className="bg-brand-green hover:bg-brand-green/90 text-white font-black uppercase tracking-widest text-[10px] px-5 py-3 rounded-2xl shadow-lg shadow-brand-green/20 transition-all hover:scale-[1.02] active:scale-95 flex items-center gap-1.5 shrink-0 self-start md:self-auto cursor-pointer"
+              >
+                <Plus size={14} />
+                Adicionar Empresa
+              </button>
             </div>
             
             <div className="p-4 overflow-x-auto">
@@ -1975,6 +2210,477 @@ export default function Admin() {
             </form>
           </motion.div>
         )}
+
+        {activeTab === 'coupons' && (
+          <motion.div 
+            key="coupons"
+            initial={{ opacity: 0, x: -20 }} 
+            animate={{ opacity: 1, x: 0 }} 
+            exit={{ opacity: 0, x: 20 }}
+            className="space-y-8"
+          >
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div>
+                <h3 className="text-xl font-black text-white italic uppercase tracking-tighter">Gerenciamento de Cupons</h3>
+                <p className="text-white/40 text-[10px] font-black uppercase tracking-widest mt-1">
+                  Crie, edite, ative, desative e exclua cupons de desconto da plataforma
+                </p>
+              </div>
+
+              <button
+                onClick={() => setEditingCoupon({
+                  id: 'novo',
+                  code: '',
+                  companyId: '',
+                  description: '',
+                  discountValue: '',
+                  expiresAt: '',
+                  usedCount: 0,
+                  active: true
+                })}
+                className="bg-brand-green hover:bg-brand-green/90 text-white font-black uppercase tracking-widest text-[10px] px-6 py-4 rounded-2xl shadow-lg shadow-brand-green/20 transition-all hover:scale-[1.02] active:scale-95 flex items-center gap-2 self-start md:self-auto cursor-pointer"
+              >
+                <Plus size={14} />
+                Adicionar Cupom
+              </button>
+            </div>
+
+            {/* Coupons List */}
+            <div className="bg-[#111317] border border-white/5 rounded-[2.5rem] overflow-hidden shadow-2xl">
+              <div className="p-4 overflow-x-auto">
+                <table className="w-full text-left border-collapse min-w-[700px]">
+                  <thead>
+                    <tr className="border-b border-white/5">
+                      <th className="py-4 px-6 text-[10px] font-black text-white/30 uppercase tracking-widest">Código</th>
+                      <th className="py-4 px-6 text-[10px] font-black text-white/30 uppercase tracking-widest">Empresa</th>
+                      <th className="py-4 px-6 text-[10px] font-black text-white/30 uppercase tracking-widest">Desconto / Descrição</th>
+                      <th className="py-4 px-6 text-[10px] font-black text-white/30 uppercase tracking-widest">Validade</th>
+                      <th className="py-4 px-6 text-[10px] font-black text-white/30 uppercase tracking-widest">Uso / Limite</th>
+                      <th className="py-4 px-6 text-[10px] font-black text-white/30 uppercase tracking-widest">Status</th>
+                      <th className="py-4 px-6 text-[10px] font-black text-white/30 uppercase tracking-widest text-right">Ações</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {coupons.length === 0 ? (
+                      <tr>
+                        <td colSpan={7} className="py-12 text-center">
+                          <Ticket className="mx-auto text-white/10 mb-4" size={40} />
+                          <p className="text-white/40 font-bold text-sm">Nenhum cupom cadastrado na plataforma</p>
+                          <p className="text-white/20 text-xs mt-1">Clique no botão acima para adicionar o primeiro cupom.</p>
+                        </td>
+                      </tr>
+                    ) : (
+                      coupons.map(coupon => {
+                        const company = allCompanies.find(c => c.id === coupon.companyId);
+                        const isExpired = new Date(coupon.expiresAt) < new Date();
+
+                        return (
+                          <tr key={coupon.id} className="border-b border-white/[0.02] hover:bg-white/[0.01] transition-colors">
+                            <td className="py-5 px-6">
+                              <span className="bg-brand-blue/10 border border-brand-blue/20 text-brand-blue font-black tracking-widest text-[11px] uppercase px-3 py-1.5 rounded-xl">
+                                {coupon.code}
+                              </span>
+                            </td>
+                            <td className="py-5 px-6">
+                              <div className="flex items-center gap-3">
+                                {company?.logo && (
+                                  <img 
+                                    src={company.logo} 
+                                    alt={company.name} 
+                                    className="w-8 h-8 rounded-xl object-cover border border-white/10"
+                                    referrerPolicy="no-referrer"
+                                  />
+                                )}
+                                <div>
+                                  <p className="font-bold text-white text-xs">{company?.name || 'Empresa não encontrada'}</p>
+                                  <p className="text-[9px] font-black text-white/20 uppercase tracking-widest">ID: {coupon.companyId}</p>
+                                </div>
+                              </div>
+                            </td>
+                            <td className="py-5 px-6 max-w-xs">
+                              <p className="font-bold text-white text-xs">{coupon.discountValue}</p>
+                              <p className="text-white/40 text-[10px] font-semibold mt-1 line-clamp-1">{coupon.description}</p>
+                            </td>
+                            <td className="py-5 px-6">
+                              <span className={cn(
+                                "text-xs font-bold",
+                                isExpired ? "text-brand-orange" : "text-white/60"
+                              )}>
+                                {safeFormatDate(coupon.expiresAt)}
+                                {isExpired && <span className="text-[9px] font-black bg-brand-orange/10 px-2 py-0.5 rounded-full ml-1.5 uppercase tracking-wider">Expirado</span>}
+                              </span>
+                            </td>
+                            <td className="py-5 px-6">
+                              <p className="text-xs font-bold text-white">
+                                {coupon.usedCount} <span className="text-white/30 font-normal">/ {coupon.usageLimit || 'Sem limite'}</span>
+                              </p>
+                            </td>
+                            <td className="py-5 px-6">
+                              <button
+                                onClick={() => handleToggleCouponStatus(coupon)}
+                                className={cn(
+                                  "font-black uppercase tracking-widest text-[9px] px-3 py-1.5 rounded-xl border transition-all cursor-pointer flex items-center gap-1.5",
+                                  coupon.active !== false
+                                    ? "bg-brand-green/10 border-brand-green/20 text-brand-green hover:bg-brand-green/20"
+                                    : "bg-white/5 border-white/10 text-white/30 hover:bg-white/10"
+                                )}
+                              >
+                                {coupon.active !== false ? 'Ativo' : 'Inativo'}
+                              </button>
+                            </td>
+                            <td className="py-5 px-6 text-right">
+                              <div className="flex items-center justify-end gap-2">
+                                <button
+                                  onClick={() => setEditingCoupon(coupon)}
+                                  className="w-8 h-8 rounded-xl bg-white/5 hover:bg-white/10 text-white/60 hover:text-white flex items-center justify-center transition-all cursor-pointer"
+                                  title="Editar Cupom"
+                                >
+                                  <Edit3 size={14} />
+                                </button>
+                                <button
+                                  onClick={() => handleDeleteCoupon(coupon.id)}
+                                  className="w-8 h-8 rounded-xl bg-brand-orange/10 hover:bg-brand-orange text-brand-orange hover:text-white flex items-center justify-center transition-all cursor-pointer"
+                                  title="Excluir Cupom"
+                                >
+                                  <Trash2 size={14} />
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </motion.div>
+        )}
+
+        {activeTab === 'affiliates' && (
+          <motion.div 
+            key="affiliates"
+            initial={{ opacity: 0, x: -20 }} 
+            animate={{ opacity: 1, x: 0 }} 
+            exit={{ opacity: 0, x: 20 }}
+            className="space-y-8"
+          >
+            {/* Stats Summary */}
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+              <div className="bg-[#111317] p-6 rounded-[2rem] border border-white/5 shadow-xl">
+                <p className="text-[10px] text-white/40 font-black uppercase tracking-widest">Total em Vendas</p>
+                <p className="text-2xl font-black text-white mt-2">
+                  R$ {sales.reduce((acc, s) => acc + s.saleValue, 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                </p>
+              </div>
+              <div className="bg-[#111317] p-6 rounded-[2rem] border border-white/5 shadow-xl">
+                <p className="text-[10px] text-brand-orange font-black uppercase tracking-widest">Total de Bônus</p>
+                <p className="text-2xl font-black text-brand-orange mt-2">
+                  R$ {sales.reduce((acc, s) => acc + s.bonusValue, 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                </p>
+              </div>
+              <div className="bg-[#111317] p-6 rounded-[2rem] border border-white/5 shadow-xl">
+                <p className="text-[10px] text-amber-500 font-black uppercase tracking-widest">Bônus Pendentes/Aguardando</p>
+                <p className="text-2xl font-black text-amber-500 mt-2">
+                  R$ {sales.filter(s => s.status !== 'Finalizada').reduce((acc, s) => acc + s.bonusValue, 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                </p>
+              </div>
+              <div className="bg-[#111317] p-6 rounded-[2rem] border border-white/5 shadow-xl">
+                <p className="text-[10px] text-brand-green font-black uppercase tracking-widest">Bônus Pagos / Finalizados</p>
+                <p className="text-2xl font-black text-brand-green mt-2">
+                  R$ {sales.filter(s => s.status === 'Finalizada').reduce((acc, s) => acc + s.bonusValue, 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                </p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+              {/* Configurations & Add Sale forms */}
+              <div className="space-y-8 lg:col-span-1">
+                {/* 1. Configuration Panel */}
+                <div className="bg-[#111317] p-6 rounded-[2.5rem] border border-white/5 shadow-xl">
+                  <h4 className="text-sm font-black text-white uppercase italic tracking-tighter mb-4 flex items-center gap-2">
+                    <TrendingUp size={16} className="text-brand-orange" />
+                    Percentual de Bônus
+                  </h4>
+                  <p className="text-[10px] text-white/40 font-semibold uppercase tracking-widest mb-4">
+                    Configuração de bônus por indicação de empresas
+                  </p>
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-[10px] font-bold text-white/40 uppercase tracking-widest mb-2">
+                        Bônus ao Indicar Empresa (%)
+                      </label>
+                      <div className="relative">
+                        <input 
+                          type="number"
+                          min="0"
+                          max="100"
+                          step="0.1"
+                          value={bonusPercent}
+                          onChange={(e) => setBonusPercent(parseFloat(e.target.value) || 0)}
+                          className="w-full bg-white/5 border border-white/10 rounded-2xl py-3 px-4 text-white text-sm font-semibold focus:outline-none focus:border-brand-blue"
+                        />
+                        <span className="absolute right-4 top-1/2 -translate-y-1/2 text-white/40 font-bold">%</span>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => handleSaveAffiliateSettings(bonusPercent)}
+                      disabled={isSavingAffiliateSettings}
+                      className="w-full py-3 bg-brand-blue text-white font-black uppercase tracking-widest text-[10px] rounded-2xl shadow-xl shadow-brand-blue/15 hover:bg-brand-blue/90 transition-all cursor-pointer flex items-center justify-center gap-2"
+                    >
+                      {isSavingAffiliateSettings ? (
+                        <div className="w-4 h-4 border-2 border-white/20 border-t-white rounded-full animate-spin" />
+                      ) : (
+                        'Salvar Percentual'
+                      )}
+                    </button>
+                  </div>
+                </div>
+
+                {/* 2. Add Sale Panel */}
+                <div className="bg-[#111317] p-6 rounded-[2.5rem] border border-white/5 shadow-xl">
+                  <h4 className="text-sm font-black text-white uppercase italic tracking-tighter mb-4 flex items-center gap-2">
+                    <Plus size={16} className="text-brand-orange" />
+                    Adicionar Venda
+                  </h4>
+                  <p className="text-[10px] text-white/40 font-semibold uppercase tracking-widest mb-4">
+                    Inserir venda manual com indicação
+                  </p>
+                  <form onSubmit={handleAddSale} className="space-y-4">
+                    <div>
+                      <label className="block text-[10px] font-bold text-white/40 uppercase tracking-widest mb-2">
+                        Selecione o Afiliado
+                      </label>
+                      <select
+                        value={newSaleAffiliateId}
+                        onChange={(e) => {
+                          setNewSaleAffiliateId(e.target.value);
+                          setNewSaleCompanyId(''); // reset company select on affiliate change
+                        }}
+                        className="w-full bg-white/5 border border-white/10 rounded-2xl py-3 px-4 text-white/60 text-xs font-semibold focus:outline-none focus:border-brand-orange cursor-pointer"
+                        required
+                      >
+                        <option value="" className="bg-[#111317] text-white/40">Selecione o usuário...</option>
+                        {usersList.map((u) => (
+                          <option key={u.uid || u.id} value={u.uid || u.id} className="bg-[#111317] text-white">
+                            {u.displayName || u.name} ({u.email})
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-[10px] font-bold text-white/40 uppercase tracking-widest mb-2">
+                        Empresa Indicada
+                      </label>
+                      <select
+                        value={newSaleCompanyId}
+                        onChange={(e) => setNewSaleCompanyId(e.target.value)}
+                        disabled={!newSaleAffiliateId}
+                        className="w-full bg-white/5 border border-white/10 rounded-2xl py-3 px-4 text-white/60 text-xs font-semibold focus:outline-none focus:border-brand-orange cursor-pointer disabled:opacity-50"
+                        required
+                      >
+                        <option value="" className="bg-[#111317] text-white/40">
+                          {!newSaleAffiliateId ? 'Selecione primeiro um afiliado' : 'Selecione a empresa...'}
+                        </option>
+                        {allCompanies
+                          .filter(c => c.referredBy === newSaleAffiliateId)
+                          .map((c) => (
+                            <option key={c.id} value={c.id} className="bg-[#111317] text-white">
+                              {c.name}
+                            </option>
+                          ))}
+                      </select>
+                      {newSaleAffiliateId && allCompanies.filter(c => c.referredBy === newSaleAffiliateId).length === 0 && (
+                        <p className="text-[9px] text-amber-500 mt-1 font-semibold">
+                          ⚠️ Este usuário não possui empresas vinculadas como indicação dele.
+                        </p>
+                      )}
+                    </div>
+
+                    <div>
+                      <label className="block text-[10px] font-bold text-white/40 uppercase tracking-widest mb-2">
+                        Valor da Venda (R$)
+                      </label>
+                      <input 
+                        type="number"
+                        min="0.01"
+                        step="0.01"
+                        placeholder="Ex: 1500.00"
+                        value={newSaleValue}
+                        onChange={(e) => setNewSaleValue(e.target.value)}
+                        className="w-full bg-white/5 border border-white/10 rounded-2xl py-3 px-4 text-white text-sm font-semibold focus:outline-none focus:border-brand-orange"
+                        required
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-[10px] font-bold text-white/40 uppercase tracking-widest mb-2">
+                        Status do Bônus / Venda
+                      </label>
+                      <select
+                        value={newSaleStatus}
+                        onChange={(e) => setNewSaleStatus(e.target.value as any)}
+                        className="w-full bg-white/5 border border-white/10 rounded-2xl py-3 px-4 text-white/60 text-xs font-semibold focus:outline-none focus:border-brand-orange cursor-pointer"
+                        required
+                      >
+                        <option value="Pendente" className="bg-[#111317] text-white">Pendente</option>
+                        <option value="Aguardando Pagamento" className="bg-[#111317] text-white">Aguardando Pagamento</option>
+                        <option value="Finalizada" className="bg-[#111317] text-white">Finalizada</option>
+                      </select>
+                    </div>
+
+                    <button
+                      type="submit"
+                      className="w-full py-3 bg-brand-orange text-white font-black uppercase tracking-widest text-[10px] rounded-2xl shadow-xl shadow-brand-orange/15 hover:bg-brand-orange/90 transition-all cursor-pointer"
+                    >
+                      Adicionar Venda
+                    </button>
+                  </form>
+                </div>
+              </div>
+
+              {/* Sales List Table */}
+              <div className="bg-[#111317] rounded-[2.5rem] border border-white/5 shadow-xl overflow-hidden lg:col-span-2 p-6 flex flex-col h-fit">
+                <h4 className="text-sm font-black text-white uppercase italic tracking-tighter mb-2">
+                  Registro de Vendas e Indicações
+                </h4>
+                <p className="text-[10px] text-white/40 font-semibold uppercase tracking-widest mb-6">
+                  Visualize as vendas de indicações de afiliados e altere os status dos bônus
+                </p>
+
+                {sales.length === 0 ? (
+                  <div className="py-12 text-center">
+                    <p className="text-xs text-white/30 font-bold uppercase tracking-wider">Nenhuma venda registrada ainda</p>
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left border-collapse">
+                      <thead>
+                        <tr className="border-b border-white/5">
+                          <th className="py-4 px-4 text-[9px] font-black text-white/30 uppercase tracking-widest">Afiliado / Empresa</th>
+                          <th className="py-4 px-4 text-[9px] font-black text-white/30 uppercase tracking-widest">Venda (R$)</th>
+                          <th className="py-4 px-4 text-[9px] font-black text-white/30 uppercase tracking-widest">Bônus</th>
+                          <th className="py-4 px-4 text-[9px] font-black text-white/30 uppercase tracking-widest">Status</th>
+                          <th className="py-4 px-4 text-[9px] font-black text-white/30 uppercase tracking-widest text-right">Ações</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {sales.map((sale) => (
+                          <tr key={sale.id} className="border-b border-white/[0.02] hover:bg-white/[0.01] transition-colors">
+                            <td className="py-4 px-4">
+                              <div className="font-bold text-white text-xs">{sale.affiliateName}</div>
+                              <div className="text-[10px] text-white/40">Indicou: <span className="text-brand-orange">{sale.companyName}</span></div>
+                            </td>
+                            <td className="py-4 px-4 text-xs font-semibold text-white/80">
+                              R$ {sale.saleValue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                            </td>
+                            <td className="py-4 px-4">
+                              <div className="text-xs font-bold text-brand-orange">
+                                R$ {sale.bonusValue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                              </div>
+                              <div className="text-[9px] text-white/30">Taxa: {sale.bonusPercent}%</div>
+                            </td>
+                            <td className="py-4 px-4">
+                              <select
+                                value={sale.status}
+                                onChange={(e) => handleUpdateSaleStatus(sale.id, e.target.value as any)}
+                                className={cn(
+                                  "px-2 py-1 rounded-lg text-[9px] font-black uppercase tracking-wider bg-white/5 border border-white/10 cursor-pointer focus:outline-none",
+                                  sale.status === 'Finalizada' && "text-brand-green border-brand-green/20 bg-brand-green/5",
+                                  sale.status === 'Aguardando Pagamento' && "text-amber-500 border-amber-500/20 bg-amber-500/5",
+                                  sale.status === 'Pendente' && "text-red-400 border-red-400/20 bg-red-400/5"
+                                )}
+                              >
+                                <option value="Pendente" className="bg-[#111317] text-white">Pendente</option>
+                                <option value="Aguardando Pagamento" className="bg-[#111317] text-white">Aguardando Pagamento</option>
+                                <option value="Finalizada" className="bg-[#111317] text-white">Finalizada</option>
+                              </select>
+                            </td>
+                            <td className="py-4 px-4 text-right">
+                              <button
+                                onClick={() => handleDeleteSale(sale.id)}
+                                className="p-2 text-white/20 hover:text-red-400 transition-colors"
+                                title="Excluir"
+                              >
+                                <Trash2 size={14} />
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+
+              {/* Seção de Solicitações de Saque de Afiliados */}
+              <div className="bg-[#111317] rounded-[2.5rem] border border-white/5 shadow-xl overflow-hidden p-6 flex flex-col h-fit mt-8">
+                <h4 className="text-sm font-black text-white uppercase italic tracking-tighter mb-2">
+                  Solicitações de Saque de Afiliados
+                </h4>
+                <p className="text-[10px] text-white/40 font-semibold uppercase tracking-widest mb-6">
+                  Visualize e gerencie os pedidos de saque efetuados pelos parceiros afiliados
+                </p>
+
+                {withdraws.length === 0 ? (
+                  <div className="py-12 text-center">
+                    <p className="text-xs text-white/30 font-bold uppercase tracking-wider">Nenhuma solicitação de saque pendente ou registrada</p>
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left border-collapse">
+                      <thead>
+                        <tr className="border-b border-white/5">
+                          <th className="py-4 px-4 text-[9px] font-black text-white/30 uppercase tracking-widest">Usuário / Email</th>
+                          <th className="py-4 px-4 text-[9px] font-black text-white/30 uppercase tracking-widest">Chave Pix</th>
+                          <th className="py-4 px-4 text-[9px] font-black text-white/30 uppercase tracking-widest">Valor do Saque</th>
+                          <th className="py-4 px-4 text-[9px] font-black text-white/30 uppercase tracking-widest">Data</th>
+                          <th className="py-4 px-4 text-[9px] font-black text-white/30 uppercase tracking-widest">Status</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {withdraws.map((req) => (
+                          <tr key={req.id} className="border-b border-white/[0.02] hover:bg-white/[0.01] transition-colors">
+                            <td className="py-4 px-4">
+                              <div className="font-bold text-white text-xs">{req.userName}</div>
+                              <div className="text-[10px] text-white/40">{req.userEmail}</div>
+                            </td>
+                            <td className="py-4 px-4 text-xs font-semibold text-white/80 font-mono">
+                              {req.pixKey}
+                            </td>
+                            <td className="py-4 px-4 text-xs font-bold text-brand-green">
+                              R$ {req.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                            </td>
+                            <td className="py-4 px-4 text-[10px] text-white/50">
+                              {safeFormatDate(req.createdAt)}
+                            </td>
+                            <td className="py-4 px-4">
+                              <select
+                                value={req.status}
+                                onChange={(e) => handleUpdateWithdrawStatus(req.id, e.target.value as any)}
+                                className={cn(
+                                  "px-2 py-1 rounded-lg text-[9px] font-black uppercase tracking-wider bg-white/5 border border-white/10 cursor-pointer focus:outline-none",
+                                  req.status === 'Aprovado' && "text-brand-green border-brand-green/20 bg-brand-green/5",
+                                  req.status === 'Recusado' && "text-red-400 border-red-400/20 bg-red-400/5",
+                                  req.status === 'Pendente' && "text-amber-500 border-amber-500/20 bg-amber-500/5"
+                                )}
+                              >
+                                <option value="Pendente" className="bg-[#111317] text-white font-bold text-xs">Pendente</option>
+                                <option value="Aprovado" className="bg-[#111317] text-white font-bold text-xs">Aprovado</option>
+                                <option value="Recusado" className="bg-[#111317] text-white font-bold text-xs">Recusado</option>
+                              </select>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            </div>
+          </motion.div>
+        )}
       </AnimatePresence>
 
       <AnimatePresence>
@@ -1994,8 +2700,21 @@ export default function Admin() {
         {editingCompany && (
           <CompanyEditor 
             company={editingCompany} 
+            usersList={usersList}
+            categories={categories}
             onSave={handleSaveCompany} 
             onCancel={() => setEditingCompany(null)} 
+          />
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {editingCoupon && (
+          <CouponEditor 
+            coupon={editingCoupon}
+            companies={allCompanies}
+            onSave={handleSaveCoupon}
+            onCancel={() => setEditingCoupon(null)}
           />
         )}
       </AnimatePresence>

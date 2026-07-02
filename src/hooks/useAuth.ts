@@ -15,6 +15,15 @@ export interface User {
   email: string;
   displayName: string;
   role: 'admin' | 'cliente' | 'empresa' | 'user';
+  pixKey?: string;
+  phone?: string;
+  cep?: string;
+  street?: string;
+  number?: string;
+  complement?: string;
+  neighborhood?: string;
+  city?: string;
+  state?: string;
 }
 
 export function useAuth() {
@@ -45,8 +54,26 @@ export function useAuth() {
             role = 'admin';
           }
 
+          let pixKey = '';
+          let phone = '';
+          let cep = '';
+          let street = '';
+          let number = '';
+          let complement = '';
+          let neighborhood = '';
+          let city = '';
+          let state = '';
           if (userSnap.exists()) {
             role = userSnap.data().role || role;
+            pixKey = userSnap.data().pixKey || '';
+            phone = userSnap.data().phone || '';
+            cep = userSnap.data().cep || '';
+            street = userSnap.data().street || '';
+            number = userSnap.data().number || '';
+            complement = userSnap.data().complement || '';
+            neighborhood = userSnap.data().neighborhood || '';
+            city = userSnap.data().city || '';
+            state = userSnap.data().state || '';
           } else {
             // First time social login or email registration missing firestore doc
             await setDoc(userDocRef, {
@@ -62,7 +89,16 @@ export function useAuth() {
             uid: firebaseUser.uid,
             email: email,
             displayName: firebaseUser.displayName || 'Usuário Vapt',
-            role: role
+            role: role,
+            pixKey: pixKey,
+            phone: phone,
+            cep: cep,
+            street: street,
+            number: number,
+            complement: complement,
+            neighborhood: neighborhood,
+            city: city,
+            state: state
           };
 
           setUser(sessionUser);
@@ -109,8 +145,26 @@ export function useAuth() {
       // Check or create Firestore document
       const userDocRef = doc(db, 'users', firebaseUser.uid);
       const userSnap = await getDoc(userDocRef);
+      let pixKey = '';
+      let phone = '';
+      let cep = '';
+      let street = '';
+      let number = '';
+      let complement = '';
+      let neighborhood = '';
+      let city = '';
+      let state = '';
       if (userSnap.exists()) {
         role = userSnap.data().role || role;
+        pixKey = userSnap.data().pixKey || '';
+        phone = userSnap.data().phone || '';
+        cep = userSnap.data().cep || '';
+        street = userSnap.data().street || '';
+        number = userSnap.data().number || '';
+        complement = userSnap.data().complement || '';
+        neighborhood = userSnap.data().neighborhood || '';
+        city = userSnap.data().city || '';
+        state = userSnap.data().state || '';
       } else {
         await setDoc(userDocRef, {
           uid: firebaseUser.uid,
@@ -125,7 +179,16 @@ export function useAuth() {
         uid: firebaseUser.uid,
         email: email,
         displayName: firebaseUser.displayName || 'Usuário Vapt',
-        role: role
+        role: role,
+        pixKey: pixKey,
+        phone: phone,
+        cep: cep,
+        street: street,
+        number: number,
+        complement: complement,
+        neighborhood: neighborhood,
+        city: city,
+        state: state
       };
 
       setUser(sessionUser);
@@ -152,19 +215,46 @@ export function useAuth() {
       const userSnap = await getDoc(userDocRef);
       
       let role: 'admin' | 'cliente' | 'empresa' | 'user' = 'cliente';
+      let pixKey = '';
+      let phone = '';
+      let cep = '';
+      let street = '';
+      let number = '';
+      let complement = '';
+      let neighborhood = '';
+      let city = '';
+      let state = '';
       if (targetEmail.includes('admin') || targetEmail === 'joao@exemplo.com' || targetEmail === 'aplicativo.vaptmarket@gmail.com') {
         role = 'admin';
       }
 
       if (userSnap.exists()) {
         role = userSnap.data().role || role;
+        pixKey = userSnap.data().pixKey || '';
+        phone = userSnap.data().phone || '';
+        cep = userSnap.data().cep || '';
+        street = userSnap.data().street || '';
+        number = userSnap.data().number || '';
+        complement = userSnap.data().complement || '';
+        neighborhood = userSnap.data().neighborhood || '';
+        city = userSnap.data().city || '';
+        state = userSnap.data().state || '';
       }
 
       const sessionUser: User = {
         uid: firebaseUser.uid,
         email: targetEmail,
         displayName: firebaseUser.displayName || 'Usuário Vapt',
-        role: role
+        role: role,
+        pixKey: pixKey,
+        phone: phone,
+        cep: cep,
+        street: street,
+        number: number,
+        complement: complement,
+        neighborhood: neighborhood,
+        city: city,
+        state: state
       };
 
       setUser(sessionUser);

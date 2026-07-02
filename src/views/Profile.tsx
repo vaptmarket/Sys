@@ -10,6 +10,7 @@ import {
   Bell, 
   Shield, 
   ChevronRight,
+  FileText,
   LogOut,
   Camera,
   LogIn,
@@ -28,22 +29,36 @@ import {
   Globe,
   Instagram,
   Clock,
-  QrCode
+  QrCode,
+  Copy,
+  ExternalLink,
+  Share2,
+  DollarSign
 } from 'lucide-react';
-import { adService, couponService, companyService, categoryService, events } from '../services/mockFirebase';
-import { Ad, UserCoupon, Company } from '../types';
-import { Link } from 'react-router-dom';
+import { adService, couponService, companyService, categoryService, salesService, events, withdrawService, notificationService } from '../services/mockFirebase';
+import { Ad, UserCoupon, Company, Sale, WithdrawRequest, AppNotification } from '../types';
+import { Link, Navigate, useSearchParams } from 'react-router-dom';
+import { safeFormatDate } from '../utils/date';
 import { cn, getInitials, formatNumber } from '../lib/utils';
 import { useAuth } from '../hooks/useAuth';
 import { Helmet } from 'react-helmet-async';
 import toast from 'react-hot-toast';
 
-import { Navigate } from 'react-router-dom';
 import QrCodeModal from '../components/QrCodeModal';
 
 export default function Profile() {
   const { user, isAuthenticated, loading, login, logout, updateProfile } = useAuth();
-  const [activeTab, setActiveTab] = React.useState<'saved' | 'coupons' | 'company' | 'statistics' | 'history'>('saved');
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [activeTab, setActiveTab] = React.useState<'saved' | 'coupons' | 'company' | 'statistics' | 'history' | 'affiliate' | 'notifications'>('saved');
+
+  React.useEffect(() => {
+    const tab = searchParams.get('tab');
+    if (tab === 'notifications') {
+      setActiveTab('notifications');
+      // Clear tab from query parameters to not get stuck on refresh
+      setSearchParams({}, { replace: true });
+    }
+  }, [searchParams, setSearchParams]);
   const [savedAds, setSavedAds] = React.useState<Ad[]>([]);
   const [userCoupons, setUserCoupons] = React.useState<UserCoupon[]>([]);
   const [isLoading, setIsLoading] = React.useState(false);
@@ -52,6 +67,22 @@ export default function Profile() {
   const [companyAds, setCompanyAds] = React.useState<Ad[]>([]);
   const [viewHistory, setViewHistory] = React.useState<Ad[]>([]);
   const [availableCats, setAvailableCats] = React.useState<any[]>([]);
+  const [referredCompanies, setReferredCompanies] = React.useState<Company[]>([]);
+  const [affiliateSales, setAffiliateSales] = React.useState<Sale[]>([]);
+  const [pixKeyInput, setPixKeyInput] = React.useState('');
+  const [withdrawRequests, setWithdrawRequests] = React.useState<WithdrawRequest[]>([]);
+  const [notifications, setNotifications] = React.useState<AppNotification[]>([]);
+  const [withdrawAmountInput, setWithdrawAmountInput] = React.useState('');
+  const [isSavingPix, setIsSavingPix] = React.useState(false);
+  const [isRequestingWithdraw, setIsRequestingWithdraw] = React.useState(false);
+  const [filterType, setFilterType] = React.useState<'all' | 'unread' | 'coupon' | 'approval' | 'chat'>('all');
+
+  React.useEffect(() => {
+    if (user?.pixKey) {
+      setPixKeyInput(user.pixKey);
+    }
+  }, [user?.pixKey]);
+
   const [selectedCoupon, setSelectedCoupon] = React.useState<{
     code: string;
     discountValue: string;
@@ -132,6 +163,15 @@ export default function Profile() {
 
   const [isEditModalOpen, setIsEditModalOpen] = React.useState(false);
   const [editName, setEditName] = React.useState('');
+  const [editPhone, setEditPhone] = React.useState('');
+  const [editPixKey, setEditPixKey] = React.useState('');
+  const [editCep, setEditCep] = React.useState('');
+  const [editStreet, setEditStreet] = React.useState('');
+  const [editNumber, setEditNumber] = React.useState('');
+  const [editComplement, setEditComplement] = React.useState('');
+  const [editNeighborhood, setEditNeighborhood] = React.useState('');
+  const [editCity, setEditCity] = React.useState('');
+  const [editState, setEditState] = React.useState('');
 
   const [emailNotifications, setEmailNotifications] = React.useState<boolean>(() => {
     return localStorage.getItem('vapt_pref_email_notifications') !== 'false';
@@ -141,10 +181,19 @@ export default function Profile() {
   });
 
   React.useEffect(() => {
-    if (user?.displayName) {
-      setEditName(user.displayName);
+    if (user) {
+      setEditName(user.displayName || '');
+      setEditPhone(user.phone || '');
+      setEditPixKey(user.pixKey || '');
+      setEditCep(user.cep || '');
+      setEditStreet(user.street || '');
+      setEditNumber(user.number || '');
+      setEditComplement(user.complement || '');
+      setEditNeighborhood(user.neighborhood || '');
+      setEditCity(user.city || '');
+      setEditState(user.state || '');
     }
-  }, [user?.displayName]);
+  }, [user]);
 
   const toggleEmailNotifications = () => {
     const newValue = !emailNotifications;
@@ -169,6 +218,86 @@ export default function Profile() {
     } catch (err) {
       console.error('Falha ao remover anúncio do estado do perfil:', err);
       toast.error('Ocorreu um erro ao tentar remover.');
+    }
+  };
+
+  const handleSavePixKey = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!user) return;
+    if (!pixKeyInput.trim()) {
+      toast.error('Por favor, informe uma Chave Pix válida.');
+      return;
+    }
+    setIsSavingPix(true);
+    const loadId = toast.loading('Salvando Chave Pix...');
+    try {
+      await updateProfile({ pixKey: pixKeyInput.trim() });
+      toast.success('Chave Pix registrada com sucesso!', { id: loadId });
+    } catch (err) {
+      console.error('Failed to save Pix Key:', err);
+      toast.error('Erro ao salvar Chave Pix.', { id: loadId });
+    } finally {
+      setIsSavingPix(false);
+    }
+  };
+
+  const handleRequestWithdraw = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!user) return;
+
+    if (!pixKeyInput.trim()) {
+      toast.error('Você precisa cadastrar uma Chave Pix antes de solicitar um saque.');
+      return;
+    }
+
+    const availableBonus = affiliateSales
+      .filter(s => s.status === 'Finalizada')
+      .reduce((acc, s) => acc + s.bonusValue, 0);
+
+    const alreadyWithdrawn = withdrawRequests
+      .filter(w => w.status === 'Aprovado' || w.status === 'Pendente')
+      .reduce((acc, w) => acc + w.amount, 0);
+
+    const withdrawable = Math.max(0, availableBonus - alreadyWithdrawn);
+
+    const requestedAmount = parseFloat(withdrawAmountInput);
+
+    if (isNaN(requestedAmount) || requestedAmount <= 0) {
+      toast.error('Informe um valor válido e maior que zero para o saque.');
+      return;
+    }
+
+    if (requestedAmount > withdrawable) {
+      toast.error(`Saldo insuficiente. Você pode sacar no máximo R$ ${withdrawable.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}.`);
+      return;
+    }
+
+    setIsRequestingWithdraw(true);
+    const loadId = toast.loading('Processando solicitação de saque...');
+    try {
+      const finalPixKey = pixKeyInput.trim();
+      if (finalPixKey !== user.pixKey) {
+        await updateProfile({ pixKey: finalPixKey });
+      }
+
+      await withdrawService.create({
+        userId: user.uid,
+        userName: user.displayName || 'Usuário Vapt',
+        userEmail: user.email,
+        pixKey: finalPixKey,
+        amount: requestedAmount,
+        status: 'Pendente'
+      });
+
+      setWithdrawAmountInput('');
+      
+      await fetchData();
+      toast.success('Solicitação de saque enviada com sucesso! Aguarde a liberação do administrador.', { id: loadId });
+    } catch (err) {
+      console.error('Error requesting withdrawal:', err);
+      toast.error('Erro ao solicitar saque.', { id: loadId });
+    } finally {
+      setIsRequestingWithdraw(false);
     }
   };
 
@@ -219,6 +348,18 @@ export default function Profile() {
           historyAds = allAds.slice(0, 4);
         }
         setViewHistory(historyAds);
+
+        // Fetch affiliate, referred companies, and notifications
+        const [allComps, salesData, withdrawsData, notifsData] = await Promise.all([
+          companyService.getAll(),
+          salesService.getByAffiliateId(user.uid),
+          withdrawService.getByUserId(user.uid),
+          notificationService.getAll()
+        ]);
+        setReferredCompanies(allComps.filter(c => c.referredBy === user.uid));
+        setAffiliateSales(salesData);
+        setWithdrawRequests(withdrawsData);
+        setNotifications(notifsData);
       } catch (err) {
         console.error('Failed to fetch profile data:', err);
       } finally {
@@ -249,6 +390,15 @@ export default function Profile() {
       window.removeEventListener('storage', handleUpdate);
     };
   }, [fetchData, user]);
+
+  React.useEffect(() => {
+    const unsubscribe = events.subscribe('notifications_updated', (updated: AppNotification[]) => {
+      setNotifications(updated);
+    });
+    return () => {
+      unsubscribe();
+    };
+  }, []);
 
   if (loading) {
     return (
@@ -306,7 +456,7 @@ export default function Profile() {
             
             <div className="flex flex-col sm:flex-row items-center justify-center md:justify-start gap-3 sm:gap-4 mb-8 md:mb-6">
               <div className="flex items-center gap-2 text-white/40 text-sm font-medium">
-                <MapPin size={16} /> São Paulo, SP
+                <MapPin size={16} /> {user?.city ? `${user.city}, ${user.state || 'SP'}` : 'São Paulo, SP'}
               </div>
               <div className="flex items-center gap-2 text-white/40 text-sm font-medium">
                 <Bell size={16} /> 3 Notificações
@@ -441,6 +591,59 @@ export default function Profile() {
               </div>
               <ChevronRight size={16} />
             </button>
+
+            <button 
+              onClick={() => setActiveTab('affiliate')}
+              className={cn(
+                "w-full flex items-center justify-between p-6 transition-all group border-t border-white/5",
+                activeTab === 'affiliate' ? "bg-white/5 text-brand-orange" : "text-white/40 hover:text-white"
+              )}
+            >
+              <div className="flex items-center gap-4">
+                <div className={cn("w-10 h-10 rounded-xl flex items-center justify-center transition-colors", activeTab === 'affiliate' ? "bg-brand-orange/10" : "bg-white/5 group-hover:bg-white/10")}>
+                  <TrendingUp size={20} className="text-brand-orange" />
+                </div>
+                <span className="font-bold uppercase tracking-widest text-xs">Indicações (Afiliado)</span>
+              </div>
+              <ChevronRight size={16} />
+            </button>
+
+            <button 
+              onClick={() => setActiveTab('notifications')}
+              className={cn(
+                "w-full flex items-center justify-between p-6 transition-all group border-t border-white/5",
+                activeTab === 'notifications' ? "bg-white/5 text-brand-orange" : "text-white/40 hover:text-white"
+              )}
+            >
+              <div className="flex items-center gap-4">
+                <div className={cn("w-10 h-10 rounded-xl flex items-center justify-center transition-colors relative", activeTab === 'notifications' ? "bg-brand-orange/10" : "bg-white/5 group-hover:bg-white/10")}>
+                  <Bell size={20} className={cn(activeTab === 'notifications' ? "text-brand-orange" : "")} />
+                  {notifications.filter(n => n.unread).length > 0 && (
+                    <span className="absolute -top-1 -right-1 w-5 h-5 bg-brand-orange text-white text-[9px] font-black rounded-full flex items-center justify-center border-2 border-[#111317]">
+                      {notifications.filter(n => n.unread).length}
+                    </span>
+                  )}
+                </div>
+                <span className="font-bold uppercase tracking-widest text-xs">Notificações</span>
+              </div>
+              <ChevronRight size={16} />
+            </button>
+
+            <Link 
+              to="/termos"
+              className="w-full flex items-center justify-between p-6 transition-all group border-t border-white/5 text-white/40 hover:text-white hover:bg-white/[0.02]"
+            >
+              <div className="flex items-center gap-4">
+                <div className="w-10 h-10 rounded-xl flex items-center justify-center transition-colors bg-white/5 group-hover:bg-white/10">
+                  <FileText size={20} className="text-brand-blue group-hover:scale-110 transition-transform" />
+                </div>
+                <div className="text-left">
+                  <span className="block font-bold uppercase tracking-widest text-xs">Termos & Privacidade</span>
+                  <span className="block text-[8px] text-white/30 font-semibold uppercase tracking-wider mt-0.5">Políticas da Plataforma</span>
+                </div>
+              </div>
+              <ChevronRight size={16} />
+            </Link>
           </div>
 
           <div id="quick-settings" className="bg-surface-panel rounded-3xl border border-white/10 p-6 space-y-6">
@@ -580,7 +783,7 @@ export default function Profile() {
                     <p className="text-brand-orange font-black text-2xl tracking-tight leading-none mt-1">{coupon.discountValue}</p>
                     <p className="text-white/40 text-[10px] font-bold uppercase tracking-widest mt-2 flex items-center justify-center md:justify-start gap-1">
                       <span className="w-1.5 h-1.5 rounded-full bg-brand-green animate-pulse" />
-                      Expira em: {new Date(coupon.expiresAt).toLocaleDateString()}
+                      Expira em: {safeFormatDate(coupon.expiresAt)}
                     </p>
                   </div>
                   <div className="bg-white/5 px-6 py-4 rounded-2xl border-2 border-dashed border-white/10 flex flex-col items-center shrink-0 min-w-[150px] gap-2">
@@ -668,6 +871,7 @@ export default function Profile() {
                             setCompAddress('');
 
                             await companyService.create({ ...userCompany, userId: 'deleted_or_other' });
+                            window.dispatchEvent(new Event('vapt_company_updated'));
                             fetchData();
                             toast.success('Empresa desvinculada! Agora você pode criar uma nova de exemplo.');
                           }
@@ -890,6 +1094,7 @@ export default function Profile() {
                         });
                         
                         toast.success('Empresa Parceira cadastrada com sucesso!');
+                        window.dispatchEvent(new Event('vapt_company_updated'));
                         fetchData();
                       } catch (err) {
                         toast.error('Erro ao efetuar cadastro da empresa.');
@@ -920,7 +1125,7 @@ export default function Profile() {
                         </div>
 
                         <div className="space-y-1.5">
-                          <label className="text-[8px] font-black uppercase text-white/30 tracking-widest pl-1">Setor / Categoria Principal *</label>
+                          <label className="text-[8px] font-black uppercase text-white/30 tracking-widest pl-1">Canal / Categoria da Empresa *</label>
                           <select 
                             required
                             value={compCategory}
@@ -1340,6 +1545,394 @@ export default function Profile() {
               )}
             </div>
           )}
+
+          {activeTab === 'affiliate' && (
+            <div className="space-y-8 font-sans">
+              <div>
+                <h3 className="text-white font-black uppercase tracking-tighter italic text-base">Seu Painel de Afiliado</h3>
+                <p className="text-white/40 text-[9px] uppercase font-bold tracking-widest mt-0.5">Indique empresas e fature bônus por cada venda realizada na plataforma!</p>
+              </div>
+
+              {/* Referral Link Card */}
+              <div className="bg-surface-panel p-6 rounded-3xl border border-white/10 relative overflow-hidden">
+                <div className="absolute top-0 right-0 w-32 h-32 bg-brand-orange/5 rounded-full -mr-16 -mt-16 blur-xl pointer-events-none" />
+                <h4 className="text-xs font-black text-white uppercase tracking-widest mb-3 flex items-center gap-2">
+                  <Share2 size={14} className="text-brand-orange animate-pulse" />
+                  Seu Link de Indicação Exclusivo
+                </h4>
+                <p className="text-[10px] text-white/50 leading-relaxed mb-4">
+                  Copie e envie este link para donos de empresas. Quando eles se cadastrarem na plataforma usando o seu link, a empresa deles ficará vinculada à sua conta de afiliado para sempre!
+                </p>
+
+                <div className="flex flex-col sm:flex-row gap-3">
+                  <div className="flex-1 bg-black/40 border border-white/5 rounded-xl px-4 py-3 text-white text-xs font-mono font-semibold flex items-center select-all overflow-x-auto whitespace-nowrap">
+                    {`${window.location.origin}/#/afiliado/${user.uid}`}
+                  </div>
+                  <button
+                    onClick={() => {
+                      navigator.clipboard.writeText(`${window.location.origin}/#/afiliado/${user.uid}`);
+                      toast.success('Link de indicação copiado com sucesso!');
+                    }}
+                    className="px-6 py-3 bg-brand-orange hover:bg-brand-orange/90 text-white font-black uppercase tracking-widest text-[10px] rounded-xl shadow-lg shadow-brand-orange/15 transition-all flex items-center justify-center gap-2 cursor-pointer shrink-0"
+                  >
+                    <Copy size={14} />
+                    Copiar Link
+                  </button>
+                </div>
+              </div>
+
+              {/* Financial Summary Stats */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
+                <div className="bg-[#111317] p-6 rounded-2xl border border-white/5 shadow-xl">
+                  <p className="text-[10px] text-white/40 font-black uppercase tracking-widest">Bônus Acumulado</p>
+                  <p className="text-xl font-black text-white mt-2">
+                    R$ {affiliateSales.reduce((acc, s) => acc + s.bonusValue, 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                  </p>
+                </div>
+                <div className="bg-[#111317] p-6 rounded-2xl border border-white/5 shadow-xl">
+                  <p className="text-[10px] text-brand-green font-black uppercase tracking-widest">Bônus Recebido (Finalizado)</p>
+                  <p className="text-xl font-black text-brand-green mt-2">
+                    R$ {affiliateSales.filter(s => s.status === 'Finalizada').reduce((acc, s) => acc + s.bonusValue, 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                  </p>
+                </div>
+                <div className="bg-[#111317] p-6 rounded-2xl border border-white/5 shadow-xl">
+                  <p className="text-[10px] text-amber-500 font-black uppercase tracking-widest">Aguardando / Pendente</p>
+                  <p className="text-xl font-black text-amber-500 mt-2">
+                    R$ {affiliateSales.filter(s => s.status !== 'Finalizada').reduce((acc, s) => acc + s.bonusValue, 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                  </p>
+                </div>
+              </div>
+
+              {/* Seção Pix e Saque de Bônus */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {/* Cadastro Chave Pix */}
+                <div className="bg-surface-panel p-6 rounded-3xl border border-white/10 flex flex-col justify-between relative overflow-hidden">
+                  <div>
+                    <h4 className="text-xs font-black text-white uppercase tracking-widest mb-3 flex items-center gap-2">
+                      <PiggyBank size={14} className="text-brand-orange animate-pulse" />
+                      Configuração da Chave Pix
+                    </h4>
+                    <p className="text-[10px] text-white/50 leading-relaxed mb-4">
+                      Cadastre sua chave Pix para receber os pagamentos dos seus bônus de indicação. Certifique-se de que a chave está correta antes de salvar.
+                    </p>
+                  </div>
+
+                  <form onSubmit={handleSavePixKey} className="space-y-4">
+                    <div className="space-y-1.5">
+                      <label className="text-[8px] font-black text-white/40 uppercase tracking-widest block">Chave Pix para Recebimento</label>
+                      <input 
+                        type="text"
+                        value={pixKeyInput}
+                        onChange={(e) => setPixKeyInput(e.target.value)}
+                        placeholder="CPF, CNPJ, Email, Telefone ou Chave Aleatória"
+                        className="w-full bg-black/40 border border-white/5 rounded-xl px-4 py-3 text-white text-xs font-bold focus:outline-none focus:border-brand-orange transition-all"
+                      />
+                    </div>
+                    <button
+                      type="submit"
+                      disabled={isSavingPix}
+                      className="w-full py-3 bg-brand-orange hover:bg-brand-orange/90 text-white font-black uppercase tracking-widest text-[10px] rounded-xl shadow-lg shadow-brand-orange/15 transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+                    >
+                      Salvar Chave Pix
+                    </button>
+                  </form>
+                </div>
+
+                {/* Solicitação de Saque */}
+                <div className="bg-surface-panel p-6 rounded-3xl border border-white/10 flex flex-col justify-between relative overflow-hidden">
+                  <div>
+                    <h4 className="text-xs font-black text-white uppercase tracking-widest mb-3 flex items-center gap-2">
+                      <DollarSign size={14} className="text-brand-green" />
+                      Solicitar Saque de Bônus
+                    </h4>
+                    <p className="text-[10px] text-white/50 leading-relaxed mb-4">
+                      Disponível para saque: <strong className="text-brand-green">R$ {(Math.max(0, affiliateSales.filter(s => s.status === 'Finalizada').reduce((acc, s) => acc + s.bonusValue, 0) - withdrawRequests.filter(w => w.status === 'Aprovado' || w.status === 'Pendente').reduce((acc, w) => acc + w.amount, 0))).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</strong> (Bônus finalizados menos saques solicitados).
+                    </p>
+                  </div>
+
+                  <form onSubmit={handleRequestWithdraw} className="space-y-4">
+                    <div className="space-y-1.5">
+                      <label className="text-[8px] font-black text-white/40 uppercase tracking-widest block">Valor do Saque (R$)</label>
+                      <input 
+                        type="number"
+                        step="0.01"
+                        min="0.01"
+                        value={withdrawAmountInput}
+                        onChange={(e) => setWithdrawAmountInput(e.target.value)}
+                        placeholder="Ex: 50.00"
+                        className="w-full bg-black/40 border border-white/5 rounded-xl px-4 py-3 text-white text-xs font-mono font-bold focus:outline-none focus:border-brand-green transition-all"
+                      />
+                    </div>
+                    <button
+                      type="submit"
+                      disabled={isRequestingWithdraw || (Math.max(0, affiliateSales.filter(s => s.status === 'Finalizada').reduce((acc, s) => acc + s.bonusValue, 0) - withdrawRequests.filter(w => w.status === 'Aprovado' || w.status === 'Pendente').reduce((acc, w) => acc + w.amount, 0))) <= 0}
+                      className="w-full py-3 bg-brand-green text-black hover:bg-brand-green/90 font-black uppercase tracking-widest text-[10px] rounded-xl shadow-lg shadow-brand-green/15 transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+                    >
+                      Solicitar Saque
+                    </button>
+                  </form>
+                </div>
+              </div>
+
+              {/* Histórico de Solicitações de Saque */}
+              {withdrawRequests.length > 0 && (
+                <div className="bg-surface-panel p-6 rounded-3xl border border-white/10 space-y-4">
+                  <h4 className="text-xs font-black text-white uppercase tracking-widest flex items-center gap-2 border-b border-white/5 pb-3">
+                    <Clock size={14} className="text-brand-orange animate-pulse" />
+                    Histórico de Solicitações de Saque
+                  </h4>
+                  <div className="space-y-3 max-h-[250px] overflow-y-auto pr-1">
+                    {withdrawRequests.map((req) => (
+                      <div key={req.id} className="flex items-center justify-between p-3 bg-white/[0.02] border border-white/5 rounded-xl">
+                        <div className="space-y-0.5">
+                          <span className="block font-bold text-xs text-white">R$ {req.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                          <span className="block text-[8px] text-white/40 uppercase tracking-wider font-semibold">Chave Pix: {req.pixKey} • {safeFormatDate(req.createdAt)}</span>
+                        </div>
+                        <span className={cn(
+                          "px-2.5 py-0.5 rounded text-[8px] font-black uppercase tracking-wider",
+                          req.status === 'Aprovado' ? "text-brand-green bg-brand-green/5 border border-brand-green/10" :
+                          req.status === 'Recusado' ? "text-red-500 bg-red-500/5 border border-red-500/10" :
+                          "text-amber-500 bg-amber-500/5 border border-amber-500/10"
+                        )}>
+                          {req.status}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* 2-Column Grid for Referred Companies & Sales List */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                {/* Companies Referred Section */}
+                <div className="bg-surface-panel p-6 rounded-3xl border border-white/10 space-y-4">
+                  <h4 className="text-xs font-black text-white uppercase tracking-widest flex items-center gap-2 border-b border-white/5 pb-3">
+                    <Store size={14} className="text-brand-blue" />
+                    Empresas Indicadas ({referredCompanies.length})
+                  </h4>
+
+                  {referredCompanies.length === 0 ? (
+                    <div className="py-8 text-center">
+                      <p className="text-[10px] text-white/30 font-bold uppercase tracking-wider">Nenhuma empresa cadastrada ainda</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-3 max-h-[300px] overflow-y-auto pr-1">
+                      {referredCompanies.map((comp) => (
+                        <div key={comp.id} className="flex items-center justify-between p-3 bg-white/[0.02] border border-white/5 rounded-xl">
+                          <div className="flex items-center gap-3">
+                            <img src={comp.logo} alt={comp.name} className="w-8 h-8 rounded-lg object-cover bg-white/5 shrink-0" referrerPolicy="no-referrer" />
+                            <div>
+                              <span className="block font-bold text-xs text-white line-clamp-1">{comp.name}</span>
+                              <span className="block text-[8px] text-white/40 uppercase tracking-wider font-semibold">{comp.address?.split('-')[1] || 'Endereço'}</span>
+                            </div>
+                          </div>
+                          <span className={cn(
+                            "px-2.5 py-0.5 rounded text-[8px] font-black uppercase tracking-wider",
+                            comp.status === 'active' ? "text-brand-green bg-brand-green/5 border border-brand-green/10" : "text-amber-500 bg-amber-500/5 border border-amber-500/10"
+                          )}>
+                            {comp.status === 'active' ? 'Ativo' : 'Pendente'}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Sales list Section */}
+                <div className="bg-surface-panel p-6 rounded-3xl border border-white/10 space-y-4">
+                  <h4 className="text-xs font-black text-white uppercase tracking-widest flex items-center gap-2 border-b border-white/5 pb-3">
+                    <DollarSign size={14} className="text-brand-orange" />
+                    Histórico de Comissões
+                  </h4>
+
+                  {affiliateSales.length === 0 ? (
+                    <div className="py-8 text-center">
+                      <p className="text-[10px] text-white/30 font-bold uppercase tracking-wider">Nenhum bônus ou comissão gerada ainda</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-3 max-h-[300px] overflow-y-auto pr-1">
+                      {affiliateSales.map((sale) => (
+                        <div key={sale.id} className="p-3 bg-white/[0.02] border border-white/5 rounded-xl space-y-2">
+                          <div className="flex justify-between items-start">
+                            <div>
+                              <span className="block font-bold text-xs text-white">{sale.companyName}</span>
+                              <span className="block text-[8px] text-white/40 uppercase tracking-widest font-bold">Venda: R$ {sale.saleValue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                            </div>
+                            <div className="text-right">
+                              <span className="block font-black text-xs text-brand-orange">R$ {sale.bonusValue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                              <span className="block text-[8px] text-white/30 font-bold">{sale.bonusPercent}% de taxa</span>
+                            </div>
+                          </div>
+                          <div className="flex justify-between items-center border-t border-white/[0.02] pt-2">
+                            <span className="text-[8px] text-white/30 font-semibold">{safeFormatDate(sale.createdAt)}</span>
+                            <span className={cn(
+                              "px-2 py-0.5 rounded text-[8px] font-black uppercase tracking-wider",
+                              sale.status === 'Finalizada' && "text-brand-green bg-brand-green/5 border border-brand-green/10",
+                              sale.status === 'Aguardando Pagamento' && "text-amber-500 bg-amber-500/5 border border-amber-500/10",
+                              sale.status === 'Pendente' && "text-red-400 bg-red-400/5 border border-red-400/10"
+                            )}>
+                              {sale.status}
+                            </span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'notifications' && (
+            <div className="space-y-6">
+              <div className="bg-surface-panel p-6 sm:p-8 rounded-[2rem] border border-white/10 space-y-6">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-white/5 pb-4">
+                  <div>
+                    <h3 className="text-lg font-black text-white uppercase tracking-tight flex items-center gap-2">
+                      <Bell size={20} className="text-brand-orange" />
+                      Minhas Atividades & Notificações
+                    </h3>
+                    <p className="text-[10px] text-white/40 font-bold uppercase tracking-widest mt-1">
+                      Acompanhe cupons, mensagens, aprovações e novidades
+                    </p>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <button
+                      onClick={async () => {
+                        const loadId = toast.loading('Marcando como lidas...');
+                        try {
+                          await notificationService.markAllAsRead();
+                          toast.success('Todas as notificações marcadas como lidas!', { id: loadId });
+                        } catch {
+                          toast.error('Erro ao marcar notificações.', { id: loadId });
+                        }
+                      }}
+                      className="px-4 py-2 bg-white/5 hover:bg-white/10 text-white font-bold text-[9px] uppercase tracking-wider rounded-xl transition-all cursor-pointer border border-white/5"
+                    >
+                      Marcar todas como lidas
+                    </button>
+                    <button
+                      onClick={async () => {
+                        if (confirm('Tem certeza que deseja apagar todas as notificações?')) {
+                          const loadId = toast.loading('Limpando notificações...');
+                          try {
+                            await notificationService.clearAll();
+                            toast.success('Histórico de notificações limpo!', { id: loadId });
+                          } catch {
+                            toast.error('Erro ao limpar notificações.', { id: loadId });
+                          }
+                        }
+                      }}
+                      className="px-4 py-2 bg-red-500/10 hover:bg-red-500/20 text-red-400 font-bold text-[9px] uppercase tracking-wider rounded-xl transition-all cursor-pointer border border-red-500/10"
+                    >
+                      Limpar todas
+                    </button>
+                  </div>
+                </div>
+
+                {/* Filter Tabs */}
+                <div className="flex flex-wrap items-center gap-2">
+                  {[
+                    { id: 'all', label: 'Todas' },
+                    { id: 'unread', label: 'Não lidas' },
+                    { id: 'coupon', label: '⚡ Cupons' },
+                    { id: 'approval', label: '✅ Aprovações' },
+                    { id: 'chat', label: '💬 Conversas' }
+                  ].map((tab) => (
+                    <button
+                      key={tab.id}
+                      onClick={() => setFilterType(tab.id as any)}
+                      className={cn(
+                        "px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all cursor-pointer",
+                        filterType === tab.id
+                          ? "bg-brand-orange text-white"
+                          : "bg-white/5 text-white/40 hover:text-white"
+                      )}
+                    >
+                      {tab.label}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Notifications List */}
+                {notifications.filter(notif => {
+                  if (filterType === 'all') return true;
+                  if (filterType === 'unread') return notif.unread;
+                  return notif.type === filterType;
+                }).length === 0 ? (
+                  <div className="py-12 text-center bg-white/[0.01] rounded-2xl border border-white/[0.02]">
+                    <Bell className="mx-auto text-white/15 mb-3" size={32} />
+                    <p className="text-xs font-bold text-white/40 uppercase tracking-widest">Nenhuma atividade encontrada</p>
+                    <p className="text-[10px] text-white/20 mt-1">Você não tem notificações para esta categoria no momento.</p>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {notifications
+                      .filter(notif => {
+                        if (filterType === 'all') return true;
+                        if (filterType === 'unread') return notif.unread;
+                        return notif.type === filterType;
+                      })
+                      .map((notif, idx) => (
+                        <motion.div
+                          key={notif.id}
+                          initial={{ opacity: 0, y: 10 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          transition={{ delay: idx * 0.03 }}
+                          onClick={async () => {
+                            if (notif.unread) {
+                              await notificationService.markAsRead(notif.id);
+                            }
+                          }}
+                          className={cn(
+                            "p-4 rounded-2xl border transition-all relative flex gap-4 cursor-pointer text-left",
+                            notif.unread
+                              ? "bg-brand-orange/[0.03] border-brand-orange/20 hover:bg-brand-orange/[0.06]"
+                              : "bg-white/[0.01] border-white/5 hover:bg-white/[0.03]"
+                          )}
+                        >
+                          {notif.unread && (
+                            <div className="absolute left-0 top-0 bottom-0 w-1 bg-brand-orange rounded-l-2xl" />
+                          )}
+                          
+                          <div className={cn(
+                            "w-10 h-10 rounded-xl flex items-center justify-center shrink-0",
+                            notif.unread ? "bg-brand-orange/10 text-brand-orange" : "bg-white/5 text-white/40"
+                          )}>
+                            {notif.type === 'coupon' ? <Ticket size={18} /> : 
+                             notif.type === 'approval' ? <CheckCircle2 size={18} /> : 
+                             <MessageSquare size={18} />}
+                          </div>
+
+                          <div className="flex-1 min-w-0 space-y-1">
+                            <div className="flex items-center justify-between gap-2">
+                              <h4 className="text-xs font-bold text-white truncate">{notif.title}</h4>
+                              <span className="text-[8px] font-bold text-white/20 uppercase tracking-widest shrink-0 flex items-center gap-1">
+                                <Clock size={8} /> {formatRelativeTime(notif.createdAt)}
+                              </span>
+                            </div>
+                            <p className="text-[10px] text-white/50 leading-relaxed font-sans">{notif.message}</p>
+                            
+                            {notif.unread && (
+                              <button
+                                onClick={async (e) => {
+                                  e.stopPropagation();
+                                  await notificationService.markAsRead(notif.id);
+                                  toast.success('Marcada como lida');
+                                }}
+                                className="text-[8px] font-bold text-brand-orange uppercase tracking-wider hover:underline flex items-center gap-1 mt-1 cursor-pointer"
+                              >
+                                Marcar como lida
+                              </button>
+                            )}
+                          </div>
+                        </motion.div>
+                      ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
@@ -1350,39 +1943,256 @@ export default function Profile() {
             className="absolute inset-0 bg-black/60 backdrop-blur-md"
             onClick={() => setIsEditModalOpen(false)}
           />
-          <div className="bg-surface-panel border border-white/10 rounded-[2.5rem] w-full max-w-md p-8 relative z-10 shadow-2xl overflow-hidden">
+          <div className="bg-surface-panel border border-white/10 rounded-[2.5rem] w-full max-w-xl p-6 sm:p-8 relative z-10 shadow-2xl overflow-hidden">
             <div className="absolute top-0 right-0 w-32 h-32 bg-brand-orange/5 rounded-full -mr-16 -mt-16 blur-xl pointer-events-none" />
-            <h3 className="text-xl font-black text-white italic uppercase tracking-tighter mb-2 font-sans">
-              Editar Perfil
-            </h3>
-            <p className="text-white/40 text-xs font-semibold uppercase tracking-widest mb-6 font-sans">
-              Atualize as informações de exibição da sua conta
+            
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="text-xl font-black text-white italic uppercase tracking-tighter font-sans">
+                Editar Cadastro
+              </h3>
+              <button 
+                type="button"
+                onClick={() => setIsEditModalOpen(false)}
+                className="text-white/40 hover:text-white transition-colors text-xs font-black"
+              >
+                🗙
+              </button>
+            </div>
+            <p className="text-white/40 text-[10px] font-bold uppercase tracking-widest mb-6 font-sans">
+              Mantenha seus dados pessoais e de entrega sempre atualizados
             </p>
-            <form onSubmit={(e) => {
+
+            <form onSubmit={async (e) => {
               e.preventDefault();
               if (!editName.trim()) {
                 toast.error('O nome de exibição não pode estar em branco.');
                 return;
               }
-              updateProfile({ displayName: editName.trim() });
-              setIsEditModalOpen(false);
-              toast.success('Perfil atualizado com sucesso!');
-            }} className="space-y-6 font-sans">
-              <div>
-                <label className="block text-[10px] font-bold text-white/30 uppercase tracking-widest mb-2">
-                  Nome / Apelido de Exibição
-                </label>
-                <input 
-                  type="text" 
-                  value={editName}
-                  onChange={(e) => setEditName(e.target.value)}
-                  className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3.5 text-white font-bold text-sm focus:outline-none focus:border-brand-orange/50 focus:bg-white/10 transition-all placeholder:text-white/20"
-                  placeholder="Seu nome"
-                  maxLength={40}
-                  required
-                />
+              const cleanCep = editCep.replace(/\D/g, '');
+              const loadId = toast.loading('Salvando perfil...');
+              try {
+                await updateProfile({ 
+                  displayName: editName.trim(),
+                  phone: editPhone.trim(),
+                  pixKey: editPixKey.trim(),
+                  cep: cleanCep,
+                  street: editStreet.trim(),
+                  number: editNumber.trim(),
+                  complement: editComplement.trim(),
+                  neighborhood: editNeighborhood.trim(),
+                  city: editCity.trim(),
+                  state: editState.trim().toUpperCase()
+                });
+                
+                // Update local storage so sidebar gets refreshed immediately
+                if (editCity) {
+                  const locName = `${editCity}, ${editState || 'SP'}`;
+                  localStorage.setItem('vapt_user_location_name', locName);
+                  if (cleanCep) localStorage.setItem('vapt_user_cep', cleanCep);
+                  window.dispatchEvent(new Event('vapt_location_updated'));
+                }
+                
+                toast.success('Perfil atualizado com sucesso!', { id: loadId });
+                setIsEditModalOpen(false);
+              } catch (err) {
+                console.error(err);
+                toast.error('Erro ao atualizar perfil.', { id: loadId });
+              }
+            }} className="space-y-5 font-sans">
+              
+              <div className="space-y-4 max-h-[55vh] overflow-y-auto pr-1.5 pb-2 scrollbar-thin scrollbar-thumb-white/10">
+                
+                {/* 1. Dados Pessoais Section */}
+                <div className="space-y-4">
+                  <div className="text-brand-orange text-[10px] font-black uppercase tracking-widest flex items-center gap-1.5 border-b border-white/5 pb-1">
+                    <UserIcon size={12} />
+                    <span>1. Informações Pessoais</span>
+                  </div>
+
+                  <div>
+                    <label className="block text-[9px] font-bold text-white/30 uppercase tracking-widest mb-1.5 pl-1">
+                      Nome / Apelido de Exibição *
+                    </label>
+                    <input 
+                      type="text" 
+                      value={editName}
+                      onChange={(e) => setEditName(e.target.value)}
+                      className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white font-bold text-xs focus:outline-none focus:border-brand-orange/50 focus:bg-white/10 transition-all placeholder:text-white/20"
+                      placeholder="Ex: João Silva"
+                      maxLength={40}
+                      required
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-[9px] font-bold text-white/30 uppercase tracking-widest mb-1.5 pl-1">
+                        WhatsApp / Celular
+                      </label>
+                      <input 
+                        type="text" 
+                        value={editPhone}
+                        onChange={(e) => setEditPhone(formatPhone(e.target.value))}
+                        className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white font-mono font-bold text-xs focus:outline-none focus:border-brand-orange/50 focus:bg-white/10 transition-all placeholder:text-white/20"
+                        placeholder="(00) 00000-0000"
+                        maxLength={15}
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-[9px] font-bold text-white/30 uppercase tracking-widest mb-1.5 pl-1">
+                        Chave Pix (Para Reembolsos/Ganhos)
+                      </label>
+                      <input 
+                        type="text" 
+                        value={editPixKey}
+                        onChange={(e) => setEditPixKey(e.target.value)}
+                        className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white font-mono font-bold text-xs focus:outline-none focus:border-brand-orange/50 focus:bg-white/10 transition-all placeholder:text-white/20"
+                        placeholder="CPF, E-mail, Celular ou Aleatória"
+                        maxLength={100}
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* 2. Endereço Section */}
+                <div className="space-y-4 pt-2">
+                  <div className="text-brand-orange text-[10px] font-black uppercase tracking-widest flex items-center gap-1.5 border-b border-white/5 pb-1">
+                    <MapPin size={12} />
+                    <span>2. Endereço e CEP Inteligente</span>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <div className="sm:col-span-1">
+                      <label className="block text-[9px] font-bold text-white/30 uppercase tracking-widest mb-1.5 pl-1">
+                        CEP *
+                      </label>
+                      <input 
+                        type="text" 
+                        value={editCep}
+                        onChange={async (e) => {
+                          const val = formatCEP(e.target.value);
+                          setEditCep(val);
+                          const clean = val.replace(/\D/g, '');
+                          if (clean.length === 8) {
+                            const loadToast = toast.loading('Consultando CEP...');
+                            try {
+                              const res = await fetch(`https://viacep.com.br/ws/${clean}/json/`);
+                              const data = await res.json();
+                              if (data && !data.erro) {
+                                setEditStreet(data.logradouro || '');
+                                setEditNeighborhood(data.bairro || '');
+                                setEditCity(data.localidade || '');
+                                setEditState(data.uf || '');
+                                toast.success(`Endereço carregado: ${data.localidade} - ${data.uf}`, { id: loadToast });
+                              } else {
+                                toast.error('CEP não encontrado.', { id: loadToast });
+                              }
+                            } catch {
+                              toast.error('Erro de conexão ao consultar CEP.', { id: loadToast });
+                            }
+                          }
+                        }}
+                        className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white font-mono font-bold text-xs focus:outline-none focus:border-brand-orange/50 focus:bg-white/10 transition-all placeholder:text-white/20"
+                        placeholder="00000-000"
+                        maxLength={9}
+                        required
+                      />
+                    </div>
+
+                    <div className="sm:col-span-2">
+                      <label className="block text-[9px] font-bold text-white/30 uppercase tracking-widest mb-1.5 pl-1">
+                        Rua / Logradouro *
+                      </label>
+                      <input 
+                        type="text" 
+                        value={editStreet}
+                        onChange={(e) => setEditStreet(e.target.value)}
+                        className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white font-bold text-xs focus:outline-none focus:border-brand-orange/50 focus:bg-white/10 transition-all placeholder:text-white/20"
+                        placeholder="Rua, Avenida, Praça..."
+                        required
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-[9px] font-bold text-white/30 uppercase tracking-widest mb-1.5 pl-1">
+                        Número *
+                      </label>
+                      <input 
+                        type="text" 
+                        value={editNumber}
+                        onChange={(e) => setEditNumber(e.target.value)}
+                        className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white font-bold text-xs focus:outline-none focus:border-brand-orange/50 focus:bg-white/10 transition-all placeholder:text-white/20"
+                        placeholder="Número da residência"
+                        required
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-[9px] font-bold text-white/30 uppercase tracking-widest mb-1.5 pl-1">
+                        Complemento
+                      </label>
+                      <input 
+                        type="text" 
+                        value={editComplement}
+                        onChange={(e) => setEditComplement(e.target.value)}
+                        className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white font-bold text-xs focus:outline-none focus:border-brand-orange/50 focus:bg-white/10 transition-all placeholder:text-white/20"
+                        placeholder="Apto, Bloco, Fundos..."
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <div className="sm:col-span-1">
+                      <label className="block text-[9px] font-bold text-white/30 uppercase tracking-widest mb-1.5 pl-1">
+                        Bairro *
+                      </label>
+                      <input 
+                        type="text" 
+                        value={editNeighborhood}
+                        onChange={(e) => setEditNeighborhood(e.target.value)}
+                        className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white font-bold text-xs focus:outline-none focus:border-brand-orange/50 focus:bg-white/10 transition-all placeholder:text-white/20"
+                        placeholder="Bairro"
+                        required
+                      />
+                    </div>
+
+                    <div className="sm:col-span-1">
+                      <label className="block text-[9px] font-bold text-white/30 uppercase tracking-widest mb-1.5 pl-1">
+                        Cidade *
+                      </label>
+                      <input 
+                        type="text" 
+                        value={editCity}
+                        onChange={(e) => setEditCity(e.target.value)}
+                        className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white font-bold text-xs focus:outline-none focus:border-brand-orange/50 focus:bg-white/10 transition-all placeholder:text-white/20"
+                        placeholder="Cidade"
+                        required
+                      />
+                    </div>
+
+                    <div className="sm:col-span-1">
+                      <label className="block text-[9px] font-bold text-white/30 uppercase tracking-widest mb-1.5 pl-1">
+                        UF *
+                      </label>
+                      <input 
+                        type="text" 
+                        value={editState}
+                        onChange={(e) => setEditState(e.target.value)}
+                        className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white font-bold text-xs focus:outline-none focus:border-brand-orange/50 focus:bg-white/10 transition-all placeholder:text-white/20 text-center uppercase"
+                        placeholder="UF"
+                        maxLength={2}
+                        required
+                      />
+                    </div>
+                  </div>
+                </div>
+
               </div>
-              <div className="flex gap-4 pt-2">
+
+              <div className="flex gap-4 pt-2 border-t border-white/5">
                 <button 
                   type="button"
                   onClick={() => setIsEditModalOpen(false)}
@@ -1412,4 +2222,17 @@ export default function Profile() {
       />
     </div>
   );
+}
+
+function formatRelativeTime(milli: number): string {
+  const diff = Date.now() - milli;
+  const secs = Math.floor(diff / 1000);
+  const mins = Math.floor(secs / 60);
+  const hours = Math.floor(mins / 60);
+  const days = Math.floor(hours / 24);
+
+  if (secs < 60) return 'Agora mesmo';
+  if (mins < 60) return `Há ${mins} ${mins === 1 ? 'minuto' : 'minutos'}`;
+  if (hours < 24) return `Há ${hours} ${hours === 1 ? 'hora' : 'horas'}`;
+  return `Há ${days} ${days === 1 ? 'dia' : 'dias'}`;
 }

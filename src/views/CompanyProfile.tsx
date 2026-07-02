@@ -3,6 +3,7 @@ import { useParams, Link, useSearchParams } from 'react-router-dom';
 import { adService, companyService, couponService } from '../services/mockFirebase';
 import { Company, Ad, Coupon } from '../types';
 import { useAuth } from '../hooks/useAuth';
+import { safeFormatDate } from '../utils/date';
 import { 
   Instagram, 
   Globe, 
@@ -87,6 +88,8 @@ export default function CompanyProfile() {
   const [newCouponDesc, setNewCouponDesc] = React.useState('');
   const [newCouponVal, setNewCouponVal] = React.useState('');
   const [newCouponExpiry, setNewCouponExpiry] = React.useState('');
+  const [newCouponLimit, setNewCouponLimit] = React.useState('');
+  const [newCouponActive, setNewCouponActive] = React.useState(true);
   const [isCreatingCoupon, setIsCreatingCoupon] = React.useState(false);
 
   const hasManagementAccess = React.useMemo(() => {
@@ -152,7 +155,7 @@ export default function CompanyProfile() {
         
         // Get coupons
         const allCoupons = await couponService.getAll();
-        const companyCoupons = allCoupons.filter(c => c.companyId === foundCompany.id);
+        const companyCoupons = allCoupons.filter(c => c.companyId === foundCompany.id && (isManagementMode || c.active !== false));
         setCoupons(companyCoupons);
       } else {
         setCompany(null);
@@ -186,7 +189,7 @@ export default function CompanyProfile() {
         setAds(activeAds);
         
         const allCoupons = await couponService.getAll();
-        const companyCoupons = allCoupons.filter(c => c.companyId === foundCompany.id);
+        const companyCoupons = allCoupons.filter(c => c.companyId === foundCompany.id && (isManagementMode || c.active !== false));
         setCoupons(companyCoupons);
       }
     } catch (err) {
@@ -243,7 +246,7 @@ export default function CompanyProfile() {
     e.preventDefault();
     if (!company) return;
     if (!newCouponCode || !newCouponDesc || !newCouponVal || !newCouponExpiry) {
-      toast.error('Todos os campos do cupom são obrigatórios!');
+      toast.error('Os campos de Código, Descrição, Valor e Validade são obrigatórios!');
       return;
     }
 
@@ -255,13 +258,18 @@ export default function CompanyProfile() {
         code: newCouponCode.trim().toUpperCase(),
         description: newCouponDesc.trim(),
         discountValue: newCouponVal.trim(),
-        expiresAt: newCouponExpiry
+        expiresAt: newCouponExpiry,
+        usageLimit: newCouponLimit ? parseInt(newCouponLimit, 10) : undefined,
+        active: newCouponActive,
+        usedCount: 0
       });
 
       setNewCouponCode('');
       setNewCouponDesc('');
       setNewCouponVal('');
       setNewCouponExpiry('');
+      setNewCouponLimit('');
+      setNewCouponActive(true);
 
       await refreshCompanyData();
       toast.success('Novo cupom de desconto ativado!', { id: loadId });
@@ -274,6 +282,10 @@ export default function CompanyProfile() {
   };
 
   const handleDeleteCoupon = async (couponId: string) => {
+    if (user?.role !== 'admin') {
+      toast.error('O cupom só poderá ser excluído por um administrador.');
+      return;
+    }
     if (!confirm('Deseja realmente remover este cupom de desconto de forma definitiva?')) return;
     const loadId = toast.loading('Excluindo cupom...');
     try {
@@ -283,6 +295,22 @@ export default function CompanyProfile() {
     } catch (err) {
       console.error('Error deleting coupon:', err);
       toast.error('Erro ao remover o cupom.', { id: loadId });
+    }
+  };
+
+  const handleToggleCouponActive = async (coupon: Coupon) => {
+    const nextActive = coupon.active === false;
+    const loadId = toast.loading(nextActive ? 'Ativando cupom...' : 'Desativando cupom...');
+    try {
+      await couponService.create({
+        ...coupon,
+        active: nextActive
+      });
+      await refreshCompanyData();
+      toast.success(nextActive ? 'Cupom ativado com sucesso!' : 'Cupom desativado com sucesso!', { id: loadId });
+    } catch (err) {
+      console.error('Error toggling coupon status:', err);
+      toast.error('Erro ao alterar status do cupom.', { id: loadId });
     }
   };
 
@@ -537,7 +565,7 @@ export default function CompanyProfile() {
 
                     <div className="mt-4 flex items-center gap-2 text-[10px] font-bold text-white/30 uppercase tracking-widest">
                       <Tag size={12} />
-                      Expira em {new Date(coupon.expiresAt).toLocaleDateString('pt-BR')}
+                      Expira em {safeFormatDate(coupon.expiresAt)}
                     </div>
                   </motion.div>
                 ))}
@@ -1041,6 +1069,34 @@ export default function CompanyProfile() {
                       />
                     </div>
 
+                    {/* Limite de Uso */}
+                    <div className="space-y-2">
+                      <label className="block text-[9px] font-black text-white/40 uppercase tracking-widest">Limite de Uso (Opcional)</label>
+                      <input 
+                        type="number" 
+                        value={newCouponLimit}
+                        onChange={(e) => setNewCouponLimit(e.target.value)}
+                        placeholder="Ex: 100 (vazio para ilimitado)"
+                        disabled={isCreatingCoupon}
+                        min={1}
+                        className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3.5 text-white text-xs font-bold focus:outline-none focus:border-brand-orange transition-all"
+                      />
+                    </div>
+
+                    {/* Cupom Ativo Checkbox */}
+                    <div className="pt-2">
+                      <label className="flex items-center gap-2.5 cursor-pointer select-none">
+                        <input
+                          type="checkbox"
+                          checked={newCouponActive}
+                          onChange={(e) => setNewCouponActive(e.target.checked)}
+                          disabled={isCreatingCoupon}
+                          className="rounded border-white/10 text-brand-orange focus:ring-brand-orange bg-white/5 h-4 w-4 cursor-pointer"
+                        />
+                        <span className="text-xs font-bold text-white/80">Cupom Ativado e Disponível</span>
+                      </label>
+                    </div>
+
                     <button
                       type="submit"
                       disabled={isCreatingCoupon}
@@ -1055,38 +1111,104 @@ export default function CompanyProfile() {
                 <div className="lg:col-span-2 space-y-6">
                   <div className="flex items-center gap-2">
                     <Ticket className="text-brand-orange animate-bounce" size={20} />
-                    <h4 className="text-sm font-black text-white uppercase italic tracking-tighter">Cupons Emitidos Ativos ({coupons.length})</h4>
+                    <h4 className="text-sm font-black text-white uppercase italic tracking-tighter">Cupons Emitidos ({coupons.length})</h4>
                   </div>
 
                   {coupons.length > 0 ? (
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      {coupons.map((coupon) => (
-                        <div key={coupon.id} className="bg-white/[0.02] border border-white/5 rounded-2xl p-5 relative overflow-hidden group">
-                          <div className="absolute top-0 left-0 w-1 h-full bg-brand-orange" />
-                          <div className="flex items-start justify-between">
-                            <div>
-                              <span className="text-xs bg-brand-orange/15 text-brand-orange font-black px-2 py-0.5 rounded font-mono uppercase">
-                                {coupon.discountValue} OFF
-                              </span>
-                              <h5 className="text-white font-bold text-sm leading-tight mt-2">{coupon.description}</h5>
-                              <p className="text-[14px] text-brand-orange font-black font-mono tracking-widest mt-1.5">{coupon.code}</p>
-                              
-                              <div className="flex gap-4 text-[9px] text-white/30 font-bold uppercase tracking-widest mt-4">
-                                <span className="flex items-center gap-1"><Calendar size={10} /> Expira: {new Date(coupon.expiresAt).toLocaleDateString('pt-BR')}</span>
-                                <span className="flex items-center gap-1"><CheckCircle2 size={10} /> {coupon.usedCount || 0} resgates</span>
+                      {coupons.map((coupon) => {
+                        const isInactive = coupon.active === false;
+                        const hasLimit = coupon.usageLimit !== undefined && coupon.usageLimit !== null;
+                        const isLimitReached = hasLimit && (coupon.usedCount || 0) >= (coupon.usageLimit || 0);
+
+                        return (
+                          <div key={coupon.id} className={cn(
+                            "border rounded-2xl p-5 relative overflow-hidden group transition-all",
+                            isInactive 
+                              ? "bg-white/[0.01] border-white/5 opacity-50" 
+                              : "bg-white/[0.02] border-white/10"
+                          )}>
+                            <div className={cn(
+                              "absolute top-0 left-0 w-1 h-full",
+                              isInactive ? "bg-white/10" : "bg-brand-orange"
+                            )} />
+                            <div className="flex items-start justify-between gap-3">
+                              <div className="space-y-1">
+                                <div className="flex items-center gap-2">
+                                  <span className={cn(
+                                    "text-xs font-black px-2 py-0.5 rounded font-mono uppercase",
+                                    isInactive 
+                                      ? "bg-white/10 text-white/40" 
+                                      : "bg-brand-orange/15 text-brand-orange"
+                                  )}>
+                                    {coupon.discountValue} OFF
+                                  </span>
+                                  {isInactive && (
+                                    <span className="text-[8px] bg-white/5 text-white/30 font-black px-1.5 py-0.5 rounded uppercase tracking-wider">
+                                      Pausado
+                                    </span>
+                                  )}
+                                  {isLimitReached && (
+                                    <span className="text-[8px] bg-red-500/10 text-red-500 font-black px-1.5 py-0.5 rounded uppercase tracking-wider">
+                                      Esgotado
+                                    </span>
+                                  )}
+                                </div>
+                                <h5 className="text-white font-bold text-sm leading-tight pt-1">{coupon.description}</h5>
+                                <p className={cn(
+                                  "text-[14px] font-black font-mono tracking-widest pt-0.5",
+                                  isInactive ? "text-white/40" : "text-brand-orange"
+                                )}>{coupon.code}</p>
+                                
+                                <div className="flex flex-wrap gap-x-4 gap-y-1 text-[9px] text-white/30 font-bold uppercase tracking-widest mt-4">
+                                  <span className="flex items-center gap-1"><Calendar size={10} /> Expira: {safeFormatDate(coupon.expiresAt)}</span>
+                                  <span className="flex items-center gap-1">
+                                    <CheckCircle2 size={10} /> 
+                                    {coupon.usedCount || 0}
+                                    {hasLimit ? ` / ${coupon.usageLimit}` : ''} resgates
+                                  </span>
+                                </div>
+                              </div>
+
+                              <div className="flex flex-col gap-2">
+                                {/* Toggle Active/Inactive */}
+                                <button
+                                  type="button"
+                                  onClick={() => handleToggleCouponActive(coupon)}
+                                  className={cn(
+                                    "p-2 rounded-xl transition-all cursor-pointer border flex items-center justify-center",
+                                    isInactive
+                                      ? "bg-white/5 border-white/10 text-white/40 hover:bg-white/10 hover:text-white"
+                                      : "bg-brand-orange/10 border-brand-orange/20 text-brand-orange hover:bg-brand-orange/20"
+                                  )}
+                                  title={isInactive ? "Ativar Cupom" : "Desativar Cupom"}
+                                >
+                                  {isInactive ? <Eye size={14} /> : <EyeOff size={14} />}
+                                </button>
+
+                                {/* Delete only for admins */}
+                                {user?.role === 'admin' ? (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleDeleteCoupon(coupon.id)}
+                                    className="text-white/30 hover:text-red-500 hover:bg-red-500/10 p-2 rounded-xl transition-all cursor-pointer border border-transparent"
+                                    title="Remover Cupom (Excluir)"
+                                  >
+                                    <Trash2 size={14} />
+                                  </button>
+                                ) : (
+                                  <div 
+                                    className="text-white/10 p-2 rounded-xl border border-transparent cursor-not-allowed flex items-center justify-center"
+                                    title="Apenas administradores podem excluir cupons permanentemente. Você pode desativá-lo para pausar o uso."
+                                  >
+                                    <Trash2 size={14} className="opacity-20" />
+                                  </div>
+                                )}
                               </div>
                             </div>
-                            <button
-                              type="button"
-                              onClick={() => handleDeleteCoupon(coupon.id)}
-                              className="text-white/30 hover:text-red-500 hover:bg-red-500/10 p-2 rounded-xl transition-all cursor-pointer border-0"
-                              title="Remover Cupom de Desconto"
-                            >
-                              <Trash2 size={16} />
-                            </button>
                           </div>
-                        </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   ) : (
                     <div className="py-20 bg-white/[0.01] border border-white/5 rounded-3xl flex flex-col items-center justify-center text-center p-6">

@@ -300,7 +300,7 @@ export default function Login({ initialMode = 'login' }: LoginProps) {
             )}
 
             {mode === 'signup' && (
-              <div className="flex items-start space-x-2 pt-2 px-1">
+              <div className="flex items-start space-x-3 pt-3 pb-3 px-4 bg-white/[0.02] border border-white/5 rounded-2xl mt-3 hover:border-white/10 transition-all">
                 <input
                   id="agreeTerms"
                   type="checkbox"
@@ -309,8 +309,8 @@ export default function Login({ initialMode = 'login' }: LoginProps) {
                   required
                   className="mt-0.5 h-4 w-4 rounded border-white/10 bg-white/[0.03] text-brand-orange focus:ring-brand-orange focus:ring-offset-0 transition-colors cursor-pointer"
                 />
-                <label htmlFor="agreeTerms" className="text-[10px] text-white/40 font-medium select-none cursor-pointer leading-tight">
-                  Eu concordo com as <span className="text-brand-orange font-bold hover:underline cursor-pointer" onClick={(e) => { e.preventDefault(); toast('Regras de Usuário: Seu perfil e dados pessoais são protegidos pela LGPD. Não é permitido criar anúncios ofensivos, de ódio ou enganosos. Todas as campanhas passam por moderação.', { duration: 7000, icon: '🛡️' }); }}>Regras de Uso</span> e políticas de login e cadastro.
+                <label htmlFor="agreeTerms" className="text-[10px] text-white/40 font-medium select-none cursor-pointer leading-relaxed">
+                  Eu li e concordo plenamente com os <Link to="/termos" className="text-brand-orange font-bold hover:underline transition-colors">Termos de Uso</Link> e as <Link to="/termos" className="text-brand-orange font-bold hover:underline transition-colors">Políticas de Privacidade</Link> do Vapt Market.
                 </label>
               </div>
             )}

@@ -19,6 +19,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { Ad, Coupon } from '../types';
 import { cn } from '../lib/utils';
 import { Link } from 'react-router-dom';
+import { safeFormatDate } from '../utils/date';
 
 import ShareModal from './ShareModal';
 import QrCodeModal from './QrCodeModal';
@@ -286,7 +287,7 @@ export default function AdVideo({ ad, isActive, isOldest }: AdVideoProps) {
 
                 <div className="flex items-center justify-center gap-2 text-[10px] font-bold text-white/30 uppercase tracking-widest">
                    <Tag size={12} />
-                   Válido até {new Date(coupon.expiresAt).toLocaleDateString()}
+                   Válido até {safeFormatDate(coupon.expiresAt)}
                 </div>
               </div>
             </motion.div>

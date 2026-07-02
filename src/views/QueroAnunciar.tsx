@@ -319,6 +319,7 @@ export default function QueroAnunciar() {
           description: formData.description || 'Nenhuma descrição fornecida.',
           logo: companyLogo,
         });
+        window.dispatchEvent(new Event('vapt_company_updated'));
         companyName = formData.companyName;
       }
 
