@@ -29,7 +29,10 @@ import {
   TrendingUp,
   TrendingDown,
   Heart,
-  QrCode
+  QrCode,
+  Upload,
+  Image,
+  X
 } from 'lucide-react';
 import { motion } from 'motion/react';
 import { cn } from '../lib/utils';
@@ -68,6 +71,7 @@ export default function CompanyProfile() {
   const [compInstagram, setCompInstagram] = React.useState('');
   const [compWebsite, setCompWebsite] = React.useState('');
   const [compLogo, setCompLogo] = React.useState('');
+  const [compBanner, setCompBanner] = React.useState('');
   const [compCategory, setCompCategory] = React.useState('');
   const [compCnpj, setCompCnpj] = React.useState('');
   const [compCep, setCompCep] = React.useState('');
@@ -120,6 +124,7 @@ export default function CompanyProfile() {
       setCompInstagram(company.instagram || '');
       setCompWebsite(company.website || '');
       setCompLogo(company.logo || '');
+      setCompBanner(company.banner || '');
       setCompCategory(company.category || 'Restaurantes');
       setCompCnpj(company.cnpj || '');
       setCompCep(company.cep || '');
@@ -314,6 +319,22 @@ export default function CompanyProfile() {
     }
   };
 
+  const handleProfileBannerFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (file.size > 2 * 1024 * 1024) {
+        toast.error('A imagem do banner deve ter no máximo 2MB.');
+        return;
+      }
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setCompBanner(reader.result as string);
+        toast.success('Upload do banner realizado localmente!');
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
   const handleSaveProfile = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!company) return;
@@ -336,6 +357,7 @@ export default function CompanyProfile() {
         instagram: compInstagram.trim(),
         website: compWebsite.trim(),
         logo: compLogo.trim(),
+        banner: compBanner.trim(),
         category: compCategory,
         cnpj: compCnpj.trim(),
         cep: compCep.trim(),
@@ -435,7 +457,7 @@ export default function CompanyProfile() {
       {/* Header Banner */}
       <div className="relative h-48 md:h-80 rounded-[2rem] md:rounded-[3rem] overflow-hidden mb-6 md:mb-8 shadow-2xl">
         <img 
-          src="https://images.unsplash.com/photo-1497366216548-37526070297c?auto=format&fit=crop&w=1200&q=80" 
+          src={isManagementMode ? (compBanner || "https://images.unsplash.com/photo-1497366216548-37526070297c?auto=format&fit=crop&w=1200&q=80") : (company.banner || "https://images.unsplash.com/photo-1497366216548-37526070297c?auto=format&fit=crop&w=1200&q=80")} 
           alt="Banner" 
           className="w-full h-full object-cover"
         />
@@ -796,6 +818,54 @@ export default function CompanyProfile() {
                     disabled={isSavingProfile}
                     className="w-full bg-white/5 border border-white/10 rounded-2xl px-5 py-4 text-white text-xs font-bold focus:outline-none focus:border-brand-blue transition-all"
                   />
+                </div>
+
+                {/* Banner Upload or URL (Admin/Manager Edit option) */}
+                <div className="space-y-3 md:col-span-2 bg-white/[0.01] border border-white/5 p-6 rounded-3xl mt-2">
+                  <label className="flex items-center gap-2 text-[10px] font-black text-white/40 uppercase tracking-widest">
+                    <Image size={14} className="text-brand-orange" /> Banner do Perfil (Upload ou URL)
+                  </label>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-center">
+                    <div className="space-y-2">
+                      <span className="text-[10px] font-black text-white/40 uppercase tracking-widest block">Opção 1: Upload de Imagem</span>
+                      <div className="relative border border-dashed border-white/20 hover:border-brand-orange/50 rounded-2xl p-5 text-center cursor-pointer transition-all bg-black/20 hover:bg-black/30">
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={handleProfileBannerFileChange}
+                          disabled={isSavingProfile}
+                          className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
+                        />
+                        <Upload size={20} className="mx-auto text-brand-orange mb-1" />
+                        <span className="text-[10px] text-white/50 block font-bold">Escolha ou arraste uma foto</span>
+                        <span className="text-[8px] text-white/30 block mt-0.5">Máximo 2MB</span>
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <span className="text-[10px] font-black text-white/40 uppercase tracking-widest block">Opção 2: Inserir Link da Imagem (URL)</span>
+                      <input
+                        type="url"
+                        value={compBanner}
+                        onChange={(e) => setCompBanner(e.target.value)}
+                        disabled={isSavingProfile}
+                        placeholder="Ex: https://images.unsplash.com/... ou link direto"
+                        className="w-full bg-white/5 border border-white/10 rounded-2xl px-5 py-4 text-white font-bold text-xs focus:outline-none focus:border-brand-blue transition-all"
+                      />
+                    </div>
+                  </div>
+                  {compBanner && (
+                    <div className="relative h-28 w-full rounded-2xl overflow-hidden border border-white/10 mt-4">
+                      <img src={compBanner} className="w-full h-full object-cover" alt="Prévia do Banner" />
+                      <button
+                        type="button"
+                        onClick={() => setCompBanner('')}
+                        className="absolute top-2 right-2 bg-black/75 hover:bg-red-500 hover:text-white text-white/80 p-2 rounded-full transition-all cursor-pointer shadow-lg"
+                        title="Remover Banner"
+                      >
+                        <X size={14} />
+                      </button>
+                    </div>
+                  )}
                 </div>
 
                 {/* Instagram */}

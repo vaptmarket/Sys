@@ -22,6 +22,7 @@ export interface Company {
   name: string;
   description: string;
   logo: string;
+  banner?: string;
   phone: string;
   whatsapp: string;
   instagram?: string;

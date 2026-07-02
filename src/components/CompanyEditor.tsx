@@ -1,6 +1,6 @@
 import React from 'react';
 import { Company } from '../types';
-import { X, Save, Type, AlignLeft, Phone, Link, MapPin, Clock, CheckCircle, Users, FileText, Mail, Tag } from 'lucide-react';
+import { X, Save, Type, AlignLeft, Phone, Link, MapPin, Clock, CheckCircle, Users, FileText, Mail, Tag, Upload, Image } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 interface CompanyEditorProps {
@@ -35,6 +35,25 @@ export default function CompanyEditor({ company, onSave, onCancel, usersList = [
     category: company.category || (categories && categories.length > 0 ? (typeof categories[0] === 'string' ? categories[0] : (categories[0].name || categories[0].id)) : 'Restaurantes')
   });
   const [isSaving, setIsSaving] = React.useState(false);
+
+  const handleBannerFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (file.size > 2 * 1024 * 1024) {
+        toast.error('A imagem do banner deve ter no máximo 2MB.');
+        return;
+      }
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setFormData(prev => ({
+          ...prev,
+          banner: reader.result as string
+        }));
+        toast.success('Banner carregado com sucesso!');
+      };
+      reader.readAsDataURL(file);
+    }
+  };
 
   const updateAddress = (updated: Company): Company => {
     const parts = [
@@ -237,6 +256,55 @@ export default function CompanyEditor({ company, onSave, onCancel, usersList = [
                 className="w-full bg-white/5 border border-white/10 rounded-2xl px-6 py-4 text-white font-bold focus:outline-none focus:border-brand-blue transition-all disabled:opacity-50"
               />
             </div>
+          </div>
+
+          {/* Banner Upload or URL */}
+          <div className="space-y-3 bg-white/[0.01] border border-white/5 p-6 rounded-3xl">
+            <label className="flex items-center gap-2 text-[10px] font-black text-white/40 uppercase tracking-widest">
+              <Image size={14} className="text-brand-blue" /> Banner do Perfil (Upload ou URL)
+            </label>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-center">
+              <div className="space-y-2">
+                <span className="text-[10px] font-black text-white/40 uppercase tracking-widest block">Opção 1: Fazer Upload da Imagem</span>
+                <div className="relative border border-dashed border-white/20 hover:border-brand-blue/50 rounded-2xl p-5 text-center cursor-pointer transition-all bg-black/20 hover:bg-black/30">
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={handleBannerFileChange}
+                    disabled={isSaving}
+                    className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
+                  />
+                  <Upload size={20} className="mx-auto text-brand-blue mb-1" />
+                  <span className="text-[10px] text-white/50 block font-bold">Escolha ou arraste uma foto</span>
+                  <span className="text-[8px] text-white/30 block mt-0.5">Máximo 2MB</span>
+                </div>
+              </div>
+              <div className="space-y-2">
+                <span className="text-[10px] font-black text-white/40 uppercase tracking-widest block">Opção 2: Inserir Link da Imagem (URL)</span>
+                <input
+                  type="url"
+                  name="banner"
+                  value={formData.banner || ''}
+                  onChange={handleChange}
+                  disabled={isSaving}
+                  placeholder="Ex: https://images.unsplash.com/... ou link direto"
+                  className="w-full bg-white/5 border border-white/10 rounded-2xl px-5 py-4 text-white font-bold text-xs focus:outline-none focus:border-brand-blue transition-all disabled:opacity-50"
+                />
+              </div>
+            </div>
+            {formData.banner && (
+              <div className="relative h-28 w-full rounded-2xl overflow-hidden border border-white/10 mt-4">
+                <img src={formData.banner} className="w-full h-full object-cover" alt="Prévia do Banner" />
+                <button
+                  type="button"
+                  onClick={() => setFormData(prev => ({ ...prev, banner: '' }))}
+                  className="absolute top-2 right-2 bg-black/75 hover:bg-red-500 hover:text-white text-white/80 p-2 rounded-full transition-all cursor-pointer shadow-lg"
+                  title="Remover Banner"
+                >
+                  <X size={14} />
+                </button>
+              </div>
+            )}
           </div>
 
           {/* Description */}
