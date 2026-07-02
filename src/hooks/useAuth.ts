@@ -25,6 +25,7 @@ export interface User {
   neighborhood?: string;
   city?: string;
   state?: string;
+  photoURL?: string;
 }
 
 export function useAuth() {
@@ -65,6 +66,7 @@ export function useAuth() {
           let city = '';
           let state = '';
           let referredBy = '';
+          let photoURL = '';
           if (userSnap.exists()) {
             role = userSnap.data().role || role;
             pixKey = userSnap.data().pixKey || '';
@@ -77,6 +79,7 @@ export function useAuth() {
             city = userSnap.data().city || '';
             state = userSnap.data().state || '';
             referredBy = userSnap.data().referredBy || '';
+            photoURL = userSnap.data().photoURL || '';
           } else {
             // First time social login or email registration missing firestore doc
             const refId = localStorage.getItem('vapt_referral_affiliate_id') || null;
@@ -105,7 +108,8 @@ export function useAuth() {
             complement: complement,
             neighborhood: neighborhood,
             city: city,
-            state: state
+            state: state,
+            photoURL: photoURL || undefined
           };
 
           setUser(sessionUser);
@@ -162,6 +166,7 @@ export function useAuth() {
       let city = '';
       let state = '';
       let referredBy = '';
+      let photoURL = '';
       if (userSnap.exists()) {
         role = userSnap.data().role || role;
         pixKey = userSnap.data().pixKey || '';
@@ -174,6 +179,7 @@ export function useAuth() {
         city = userSnap.data().city || '';
         state = userSnap.data().state || '';
         referredBy = userSnap.data().referredBy || '';
+        photoURL = userSnap.data().photoURL || firebaseUser.photoURL || '';
       } else {
         const refId = localStorage.getItem('vapt_referral_affiliate_id') || null;
         await setDoc(userDocRef, {
@@ -182,9 +188,11 @@ export function useAuth() {
           displayName: firebaseUser.displayName || 'Usuário Vapt',
           role: role,
           referredBy: refId,
+          photoURL: firebaseUser.photoURL || '',
           createdAt: Date.now()
         });
         referredBy = refId || '';
+        photoURL = firebaseUser.photoURL || '';
       }
 
       const sessionUser: User = {
@@ -201,7 +209,8 @@ export function useAuth() {
         complement: complement,
         neighborhood: neighborhood,
         city: city,
-        state: state
+        state: state,
+        photoURL: photoURL || undefined
       };
 
       setUser(sessionUser);
@@ -242,6 +251,7 @@ export function useAuth() {
         role = 'admin';
       }
 
+      let photoURL = '';
       if (userSnap.exists()) {
         role = userSnap.data().role || role;
         pixKey = userSnap.data().pixKey || '';
@@ -254,6 +264,7 @@ export function useAuth() {
         city = userSnap.data().city || '';
         state = userSnap.data().state || '';
         referredBy = userSnap.data().referredBy || '';
+        photoURL = userSnap.data().photoURL || '';
       }
 
       const sessionUser: User = {
@@ -270,7 +281,8 @@ export function useAuth() {
         complement: complement,
         neighborhood: neighborhood,
         city: city,
-        state: state
+        state: state,
+        photoURL: photoURL || undefined
       };
 
       setUser(sessionUser);
@@ -291,7 +303,8 @@ export function useAuth() {
             uid: matchedUser.uid,
             email: matchedUser.email,
             displayName: matchedUser.displayName,
-            role: matchedUser.role || 'user'
+            role: matchedUser.role || 'user',
+            photoURL: matchedUser.photoURL
           };
           setUser(localUser);
           localStorage.setItem('vapt_auth_session', JSON.stringify(localUser));

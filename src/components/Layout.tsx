@@ -20,7 +20,9 @@ import {
   MapPin,
   Compass,
   Loader2,
-  ChevronRight
+  ChevronRight,
+  Download,
+  Plus
 } from 'lucide-react';
 import { cn, getInitials } from '../lib/utils';
 import { useAuth } from '../hooks/useAuth';
@@ -54,6 +56,52 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   const [isDetecting, setIsDetecting] = React.useState(false);
   const [hasCompany, setHasCompany] = React.useState(false);
   const [userCompanyId, setUserCompanyId] = React.useState('c1');
+
+  // PWA states
+  const [showInstallBtn, setShowInstallBtn] = React.useState(false);
+  const [showIOSGuide, setShowIOSGuide] = React.useState(false);
+  const [isStandalone, setIsStandalone] = React.useState(false);
+  const deferredPromptRef = React.useRef<any>(null);
+
+  React.useEffect(() => {
+    // Check if running in standalone (PWA install) mode
+    const isStandaloneMode = window.matchMedia('(display-mode: standalone)').matches || (navigator as any).standalone;
+    setIsStandalone(!!isStandaloneMode);
+
+    const handleBeforeInstallPrompt = (e: Event) => {
+      e.preventDefault();
+      deferredPromptRef.current = e;
+      setShowInstallBtn(true);
+    };
+
+    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+
+    return () => {
+      window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+    };
+  }, []);
+
+  const handleInstallClick = async () => {
+    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || 
+                  (navigator.userAgent.includes("Mac") && "ontouchend" in document);
+
+    if (isIOS) {
+      setShowIOSGuide(true);
+      return;
+    }
+
+    const promptEvent = deferredPromptRef.current;
+    if (!promptEvent) {
+      toast.error('Instalação direta não disponível. Você pode adicionar à tela de início no menu do seu navegador.');
+      return;
+    }
+
+    promptEvent.prompt();
+    const { outcome } = await promptEvent.userChoice;
+    console.log(`Response to installation: ${outcome}`);
+    deferredPromptRef.current = null;
+    setShowInstallBtn(false);
+  };
 
   // Load and listen to user company status to show/hide "Gestão da Empresa"
   React.useEffect(() => {
@@ -336,6 +384,26 @@ export default function Layout({ children }: { children: React.ReactNode }) {
               </nav>
 
               <div className="mt-auto pt-6">
+                {!isStandalone && (
+                  <div className="p-4 bg-gradient-to-br from-brand-blue to-brand-blue/80 rounded-2xl border border-white/10 mb-4 text-white shadow-xl relative overflow-hidden group">
+                    <div className="absolute -right-4 -bottom-4 w-20 h-20 bg-white/10 rounded-full blur-xl" />
+                    <p className="text-[10px] font-black uppercase text-white/70 tracking-widest mb-1 flex items-center gap-1">
+                      <Download size={10} className="text-white animate-bounce" />
+                      App Oficial
+                    </p>
+                    <h4 className="text-xs font-black uppercase tracking-tight mb-0.5">Vapt Market no Celular</h4>
+                    <p className="text-[9px] text-white/80 leading-relaxed font-medium mb-2.5">
+                      Instale grátis para acessar mais rápido e receber cupons de desconto!
+                    </p>
+                    <button 
+                      onClick={handleInstallClick}
+                      className="w-full py-2 bg-white text-brand-blue font-black text-[10px] uppercase tracking-widest rounded-xl hover:bg-white/95 active:scale-95 transition-all shadow-md cursor-pointer"
+                    >
+                      Instalar Aplicativo
+                    </button>
+                  </div>
+                )}
+
                 <div className="p-4 bg-surface-item rounded-xl border border-white/5 mb-4">
                   <p className="text-[10px] font-black uppercase text-white/30 tracking-widest mb-1.5 flex items-center gap-1.5">
                     <MapPin size={10} className="text-brand-blue animate-pulse" />
@@ -442,6 +510,26 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         </nav>
 
         <div className="mt-auto px-2 pb-4">
+          {!isStandalone && (
+            <div className="p-4 bg-gradient-to-br from-brand-blue to-brand-blue/80 rounded-2xl border border-white/10 mb-4 text-white shadow-xl relative overflow-hidden group">
+              <div className="absolute -right-4 -bottom-4 w-20 h-20 bg-white/10 rounded-full blur-xl group-hover:scale-125 transition-transform" />
+              <p className="text-[10px] font-black uppercase text-white/70 tracking-widest mb-1 flex items-center gap-1">
+                <Download size={10} className="text-white animate-bounce" />
+                App Oficial
+              </p>
+              <h4 className="text-xs font-black uppercase tracking-tight mb-0.5">Vapt no seu Celular</h4>
+              <p className="text-[9px] text-white/80 leading-relaxed font-medium mb-2.5">
+                Instale agora para ter um acesso ultra rápido e offline!
+              </p>
+              <button 
+                onClick={handleInstallClick}
+                className="w-full py-2 bg-white text-brand-blue font-black text-[10px] uppercase tracking-widest rounded-xl hover:bg-white/95 active:scale-95 transition-all shadow-md cursor-pointer"
+              >
+                Instalar Grátis
+              </button>
+            </div>
+          )}
+
           <div className="p-4 bg-surface-item rounded-xl border border-white/5 mb-4">
              <p className="text-[10px] font-black uppercase text-white/30 tracking-widest mb-1.5 flex items-center gap-1.5">
                <MapPin size={10} className="text-brand-blue animate-pulse" />
@@ -794,6 +882,82 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                 </div>
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* iOS PWA Installation Guide Modal */}
+      {showIOSGuide && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div 
+            className="absolute inset-0 bg-black/80 backdrop-blur-md"
+            onClick={() => setShowIOSGuide(false)}
+            id="ios_guide_overlay"
+          />
+          <div className="bg-surface-panel border border-white/10 rounded-[2.5rem] w-full max-w-md p-8 relative z-10 shadow-2xl overflow-hidden font-sans text-center">
+            <div className="absolute top-0 right-0 w-32 h-32 bg-brand-blue/5 rounded-full -mr-16 -mt-16 blur-xl pointer-events-none" />
+            
+            <div className="flex justify-end">
+              <button 
+                onClick={() => setShowIOSGuide(false)}
+                className="w-8 h-8 rounded-full bg-white/5 hover:bg-white/10 text-white/60 hover:text-white flex items-center justify-center transition-colors"
+                id="close_ios_guide"
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            <div className="w-16 h-16 bg-brand-blue/10 rounded-3xl flex items-center justify-center mx-auto mb-4 border border-brand-blue/20">
+              <Download size={28} className="text-brand-blue animate-bounce" />
+            </div>
+
+            <span className="text-[9px] font-black text-brand-blue uppercase tracking-widest block mb-1">Instalação iOS (iPhone / iPad)</span>
+            <h3 className="text-xl font-black text-white italic uppercase tracking-tighter mb-4">
+              Vapt Market no Safari
+            </h3>
+
+            <p className="text-white/50 text-xs font-semibold mb-6 leading-relaxed">
+              Adicione o Vapt Market à sua tela de início para usá-lo como um aplicativo nativo e obter a melhor experiência.
+            </p>
+
+            <div className="space-y-4 text-left">
+              <div className="flex gap-4 items-start p-3 bg-white/[0.02] border border-white/5 rounded-xl">
+                <span className="w-6 h-6 rounded-full bg-brand-blue/20 text-brand-blue flex items-center justify-center text-xs font-black shrink-0">1</span>
+                <div>
+                  <h4 className="text-xs font-black text-white uppercase tracking-wider">Clique no botão de Compartilhar</h4>
+                  <p className="text-[10px] text-white/40 font-medium mt-0.5">
+                    Toque no botão de compartilhar localizado na barra inferior do Safari (ícone de um quadrado com uma seta para cima).
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex gap-4 items-start p-3 bg-white/[0.02] border border-white/5 rounded-xl">
+                <span className="w-6 h-6 rounded-full bg-brand-blue/20 text-brand-blue flex items-center justify-center text-xs font-black shrink-0">2</span>
+                <div>
+                  <h4 className="text-xs font-black text-white uppercase tracking-wider">Selecione "Adicionar à Tela de Início"</h4>
+                  <p className="text-[10px] text-white/40 font-medium mt-0.5">
+                    Role a lista de opções para baixo e clique no item <strong className="text-white/80">"Adicionar à Tela de Início"</strong> (ícone de um quadrado com um sinal de mais <Plus size={10} className="inline-block" />).
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex gap-4 items-start p-3 bg-white/[0.02] border border-white/5 rounded-xl">
+                <span className="w-6 h-6 rounded-full bg-brand-blue/20 text-brand-blue flex items-center justify-center text-xs font-black shrink-0">3</span>
+                <div>
+                  <h4 className="text-xs font-black text-white uppercase tracking-wider">Confirme e Toque em "Adicionar"</h4>
+                  <p className="text-[10px] text-white/40 font-medium mt-0.5">
+                    No canto superior direito, toque no botão <strong className="text-white/80">"Adicionar"</strong> para finalizar. O aplicativo será instalado na sua tela inicial!
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <button
+              onClick={() => setShowIOSGuide(false)}
+              className="w-full mt-8 py-3.5 bg-brand-blue text-[10px] font-black uppercase tracking-widest text-white rounded-xl hover:bg-brand-blue/80 transition-all cursor-pointer"
+            >
+              Entendido
+            </button>
           </div>
         </div>
       )}

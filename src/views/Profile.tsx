@@ -173,6 +173,39 @@ export default function Profile() {
   const [editStreet, setEditStreet] = React.useState('');
   const [editNumber, setEditNumber] = React.useState('');
   const [editComplement, setEditComplement] = React.useState('');
+
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
+  const [isUploadingPhoto, setIsUploadingPhoto] = React.useState(false);
+
+  const handlePhotoChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 2 * 1024 * 1024) {
+      toast.error('A imagem é muito grande. Escolha uma imagem menor que 2MB.');
+      return;
+    }
+
+    setIsUploadingPhoto(true);
+    const reader = new FileReader();
+    reader.onload = async () => {
+      try {
+        const base64String = reader.result as string;
+        await updateProfile({ photoURL: base64String });
+        toast.success('Foto de perfil atualizada com sucesso!');
+      } catch (err) {
+        console.error('Failed to update photo:', err);
+        toast.error('Erro ao atualizar foto de perfil.');
+      } finally {
+        setIsUploadingPhoto(false);
+      }
+    };
+    reader.onerror = () => {
+      toast.error('Erro ao ler o arquivo de imagem.');
+      setIsUploadingPhoto(false);
+    };
+    reader.readAsDataURL(file);
+  };
   const [editNeighborhood, setEditNeighborhood] = React.useState('');
   const [editCity, setEditCity] = React.useState('');
   const [editState, setEditState] = React.useState('');
@@ -463,13 +496,32 @@ export default function Profile() {
         <div className="flex flex-col md:flex-row items-center gap-8 relative z-10">
             <div className="relative group">
             <div className="w-32 h-32 rounded-full border-4 border-brand-orange p-1 shadow-2xl shadow-brand-orange/20">
-              <div className="w-full h-full rounded-full bg-surface-item flex items-center justify-center text-4xl font-black text-white italic">
-                {getInitials(user?.displayName)}
+              <div className="w-full h-full rounded-full bg-surface-item flex items-center justify-center text-4xl font-black text-white italic overflow-hidden">
+                {user?.photoURL ? (
+                  <img src={user.photoURL} alt={user.displayName} className="w-full h-full rounded-full object-cover" />
+                ) : (
+                  getInitials(user?.displayName)
+                )}
               </div>
             </div>
-            <button className="absolute bottom-0 right-0 w-10 h-10 bg-brand-blue text-white rounded-xl flex items-center justify-center shadow-lg border-2 border-surface-panel hover:scale-110 transition-transform">
-              <Camera size={18} />
+            <button 
+              onClick={() => fileInputRef.current?.click()}
+              disabled={isUploadingPhoto}
+              className="absolute bottom-0 right-0 w-10 h-10 bg-brand-blue text-white rounded-xl flex items-center justify-center shadow-lg border-2 border-surface-panel hover:scale-110 active:scale-95 transition-all cursor-pointer"
+            >
+              {isUploadingPhoto ? (
+                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+              ) : (
+                <Camera size={18} />
+              )}
             </button>
+            <input 
+              type="file" 
+              ref={fileInputRef} 
+              onChange={handlePhotoChange} 
+              accept="image/*" 
+              className="hidden" 
+            />
           </div>
 
           <div className="text-center md:text-left flex-1">
