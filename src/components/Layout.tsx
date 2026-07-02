@@ -387,14 +387,6 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                 {!isStandalone && (
                   <div className="p-4 bg-gradient-to-br from-brand-blue to-brand-blue/80 rounded-2xl border border-white/10 mb-4 text-white shadow-xl relative overflow-hidden group">
                     <div className="absolute -right-4 -bottom-4 w-20 h-20 bg-white/10 rounded-full blur-xl" />
-                    <p className="text-[10px] font-black uppercase text-white/70 tracking-widest mb-1 flex items-center gap-1">
-                      <Download size={10} className="text-white animate-bounce" />
-                      App Oficial
-                    </p>
-                    <h4 className="text-xs font-black uppercase tracking-tight mb-0.5">Vapt Market no Celular</h4>
-                    <p className="text-[9px] text-white/80 leading-relaxed font-medium mb-2.5">
-                      Instale grátis para acessar mais rápido e receber cupons de desconto!
-                    </p>
                     <button 
                       onClick={handleInstallClick}
                       className="w-full py-2 bg-white text-brand-blue font-black text-[10px] uppercase tracking-widest rounded-xl hover:bg-white/95 active:scale-95 transition-all shadow-md cursor-pointer"
@@ -513,14 +505,6 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           {!isStandalone && (
             <div className="p-4 bg-gradient-to-br from-brand-blue to-brand-blue/80 rounded-2xl border border-white/10 mb-4 text-white shadow-xl relative overflow-hidden group">
               <div className="absolute -right-4 -bottom-4 w-20 h-20 bg-white/10 rounded-full blur-xl group-hover:scale-125 transition-transform" />
-              <p className="text-[10px] font-black uppercase text-white/70 tracking-widest mb-1 flex items-center gap-1">
-                <Download size={10} className="text-white animate-bounce" />
-                App Oficial
-              </p>
-              <h4 className="text-xs font-black uppercase tracking-tight mb-0.5">Vapt no seu Celular</h4>
-              <p className="text-[9px] text-white/80 leading-relaxed font-medium mb-2.5">
-                Instale agora para ter um acesso ultra rápido e offline!
-              </p>
               <button 
                 onClick={handleInstallClick}
                 className="w-full py-2 bg-white text-brand-blue font-black text-[10px] uppercase tracking-widest rounded-xl hover:bg-white/95 active:scale-95 transition-all shadow-md cursor-pointer"
