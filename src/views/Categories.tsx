@@ -98,7 +98,7 @@ export default function Categories() {
       </motion.header>
 
       {isLoading ? (
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 md:gap-6">
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 md:gap-6">
           {[...Array(10)].map((_, i) => (
             <div key={i} className="aspect-square rounded-3xl bg-surface-panel animate-pulse border border-white/5" />
           ))}
@@ -108,7 +108,7 @@ export default function Categories() {
           variants={containerVariants}
           initial="hidden"
           animate="visible"
-          className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 md:gap-6"
+          className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 md:gap-6"
         >
           {categories.map((cat) => {
             const ui = CATEGORY_UI[cat.name] || {

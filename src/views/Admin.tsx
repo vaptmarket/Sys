@@ -116,7 +116,7 @@ export default function Admin() {
   const [newSaleAffiliateId, setNewSaleAffiliateId] = React.useState('');
   const [newSaleCompanyId, setNewSaleCompanyId] = React.useState('');
   const [newSaleValue, setNewSaleValue] = React.useState('');
-  const [newSaleStatus, setNewSaleStatus] = React.useState<'Pendente' | 'Aguardando Pagamento' | 'Finalizada'>('Pendente');
+  const [newSaleStatus, setNewSaleStatus] = React.useState<'Pendente' | 'Aguardando Pagamento' | 'Finalizada' | 'Liberado para Saque'>('Pendente');
 
   // Editing state for categories
   const [editingCatId, setEditingCatId] = React.useState<string | null>(null);
@@ -399,7 +399,7 @@ export default function Admin() {
     }
   };
 
-  const handleUpdateSaleStatus = async (saleId: string, status: 'Pendente' | 'Aguardando Pagamento' | 'Finalizada') => {
+  const handleUpdateSaleStatus = async (saleId: string, status: 'Pendente' | 'Aguardando Pagamento' | 'Finalizada' | 'Liberado para Saque') => {
     try {
       await salesService.updateStatus(saleId, status);
       toast.success('Status da venda atualizado!');
@@ -2527,6 +2527,7 @@ export default function Admin() {
                         <option value="Pendente" className="bg-[#111317] text-white">Pendente</option>
                         <option value="Aguardando Pagamento" className="bg-[#111317] text-white">Aguardando Pagamento</option>
                         <option value="Finalizada" className="bg-[#111317] text-white">Finalizada</option>
+                        <option value="Liberado para Saque" className="bg-[#111317] text-white">Liberado para Saque</option>
                       </select>
                     </div>
 
@@ -2588,6 +2589,7 @@ export default function Admin() {
                                 className={cn(
                                   "px-2 py-1 rounded-lg text-[9px] font-black uppercase tracking-wider bg-white/5 border border-white/10 cursor-pointer focus:outline-none",
                                   sale.status === 'Finalizada' && "text-brand-green border-brand-green/20 bg-brand-green/5",
+                                  sale.status === 'Liberado para Saque' && "text-brand-green border-brand-green/20 bg-brand-green/10",
                                   sale.status === 'Aguardando Pagamento' && "text-amber-500 border-amber-500/20 bg-amber-500/5",
                                   sale.status === 'Pendente' && "text-red-400 border-red-400/20 bg-red-400/5"
                                 )}
@@ -2595,6 +2597,7 @@ export default function Admin() {
                                 <option value="Pendente" className="bg-[#111317] text-white">Pendente</option>
                                 <option value="Aguardando Pagamento" className="bg-[#111317] text-white">Aguardando Pagamento</option>
                                 <option value="Finalizada" className="bg-[#111317] text-white">Finalizada</option>
+                                <option value="Liberado para Saque" className="bg-[#111317] text-white">Liberado para Saque</option>
                               </select>
                             </td>
                             <td className="py-4 px-4 text-right">

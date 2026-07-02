@@ -1111,7 +1111,7 @@ export const salesService = {
     return newId;
   },
 
-  async updateStatus(id: string, status: 'Pendente' | 'Aguardando Pagamento' | 'Finalizada'): Promise<void> {
+  async updateStatus(id: string, status: 'Pendente' | 'Aguardando Pagamento' | 'Finalizada' | 'Liberado para Saque'): Promise<void> {
     try {
       await updateDoc(doc(db, 'sales', id), { status });
     } catch (e) {

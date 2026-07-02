@@ -288,7 +288,7 @@ export default function Profile() {
     }
 
     const availableBonus = affiliateSales
-      .filter(s => s.status === 'Finalizada')
+      .filter(s => s.status === 'Finalizada' || s.status === 'Liberado para Saque')
       .reduce((acc, s) => acc + s.bonusValue, 0);
 
     const alreadyWithdrawn = withdrawRequests
@@ -1731,37 +1731,76 @@ export default function Profile() {
 
                 {/* Solicitação de Saque */}
                 <div className="bg-surface-panel p-6 rounded-3xl border border-white/10 flex flex-col justify-between relative overflow-hidden">
-                  <div>
-                    <h4 className="text-xs font-black text-white uppercase tracking-widest mb-3 flex items-center gap-2">
-                      <DollarSign size={14} className="text-brand-green" />
-                      Solicitar Saque de Bônus
-                    </h4>
-                    <p className="text-[10px] text-white/50 leading-relaxed mb-4">
-                      Disponível para saque: <strong className="text-brand-green">R$ {(Math.max(0, affiliateSales.filter(s => s.status === 'Finalizada').reduce((acc, s) => acc + s.bonusValue, 0) - withdrawRequests.filter(w => w.status === 'Aprovado' || w.status === 'Pendente').reduce((acc, w) => acc + w.amount, 0))).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</strong> (Bônus finalizados menos saques solicitados).
-                    </p>
-                  </div>
+                  {(() => {
+                    const availableBonus = affiliateSales
+                      .filter(s => s.status === 'Finalizada' || s.status === 'Liberado para Saque')
+                      .reduce((acc, s) => acc + s.bonusValue, 0);
+                    const alreadyWithdrawn = withdrawRequests
+                      .filter(w => w.status === 'Aprovado' || w.status === 'Pendente')
+                      .reduce((acc, w) => acc + w.amount, 0);
+                    const withdrawable = Math.max(0, availableBonus - alreadyWithdrawn);
+                    const hasPixKey = !!user?.pixKey;
 
-                  <form onSubmit={handleRequestWithdraw} className="space-y-4">
-                    <div className="space-y-1.5">
-                      <label className="text-[8px] font-black text-white/40 uppercase tracking-widest block">Valor do Saque (R$)</label>
-                      <input 
-                        type="number"
-                        step="0.01"
-                        min="0.01"
-                        value={withdrawAmountInput}
-                        onChange={(e) => setWithdrawAmountInput(e.target.value)}
-                        placeholder="Ex: 50.00"
-                        className="w-full bg-black/40 border border-white/5 rounded-xl px-4 py-3 text-white text-xs font-mono font-bold focus:outline-none focus:border-brand-green transition-all"
-                      />
-                    </div>
-                    <button
-                      type="submit"
-                      disabled={isRequestingWithdraw || (Math.max(0, affiliateSales.filter(s => s.status === 'Finalizada').reduce((acc, s) => acc + s.bonusValue, 0) - withdrawRequests.filter(w => w.status === 'Aprovado' || w.status === 'Pendente').reduce((acc, w) => acc + w.amount, 0))) <= 0}
-                      className="w-full py-3 bg-brand-green text-black hover:bg-brand-green/90 font-black uppercase tracking-widest text-[10px] rounded-xl shadow-lg shadow-brand-green/15 transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
-                    >
-                      Solicitar Saque
-                    </button>
-                  </form>
+                    return (
+                      <>
+                        <div>
+                          <h4 className="text-xs font-black text-white uppercase tracking-widest mb-3 flex items-center gap-2">
+                            <DollarSign size={14} className="text-brand-green" />
+                            Solicitar Saque de Bônus
+                          </h4>
+                          <p className="text-[10px] text-white/50 leading-relaxed mb-4">
+                            Disponível para saque: <strong className="text-brand-green">R$ {withdrawable.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</strong> (Bônus finalizados menos saques solicitados).
+                          </p>
+                          
+                          {hasPixKey ? (
+                            <div className="mb-4 p-3 bg-brand-green/5 border border-brand-green/10 rounded-xl flex items-center justify-between text-[10px]">
+                              <span className="font-semibold uppercase tracking-wider text-[8px] text-white/40">Pix Cadastrado:</span>
+                              <span className="font-mono font-bold text-brand-green">{user.pixKey}</span>
+                            </div>
+                          ) : (
+                            <div className="mb-4 p-3 bg-amber-500/10 border border-amber-500/20 rounded-xl flex items-center gap-2 text-amber-500 text-[10px] font-medium leading-normal">
+                              <AlertCircle size={14} className="shrink-0 text-amber-500 animate-bounce" />
+                              <span>Você precisa cadastrar uma Chave Pix ao lado antes de solicitar o saque.</span>
+                            </div>
+                          )}
+                        </div>
+
+                        <form onSubmit={handleRequestWithdraw} className="space-y-4">
+                          <div className="space-y-1.5">
+                            <div className="flex justify-between items-center">
+                              <label className="text-[8px] font-black text-white/40 uppercase tracking-widest block">Valor do Saque (R$)</label>
+                              {withdrawable > 0 && hasPixKey && (
+                                <button
+                                  type="button"
+                                  onClick={() => setWithdrawAmountInput(withdrawable.toFixed(2))}
+                                  className="text-[8px] font-black text-brand-green uppercase tracking-widest hover:underline cursor-pointer bg-transparent border-none p-0"
+                                >
+                                  Sacar valor máximo
+                                </button>
+                              )}
+                            </div>
+                            <input 
+                              type="number"
+                              step="0.01"
+                              min="0.01"
+                              value={withdrawAmountInput}
+                              onChange={(e) => setWithdrawAmountInput(e.target.value)}
+                              placeholder="Ex: 50.00"
+                              disabled={!hasPixKey || withdrawable <= 0}
+                              className="w-full bg-black/40 border border-white/5 rounded-xl px-4 py-3 text-white text-xs font-mono font-bold focus:outline-none focus:border-brand-green transition-all disabled:opacity-30 disabled:cursor-not-allowed"
+                            />
+                          </div>
+                          <button
+                            type="submit"
+                            disabled={isRequestingWithdraw || !hasPixKey || withdrawable <= 0}
+                            className="w-full py-3 bg-brand-green text-black hover:bg-brand-green/90 disabled:hover:bg-brand-green disabled:opacity-50 font-black uppercase tracking-widest text-[10px] rounded-xl shadow-lg shadow-brand-green/15 transition-all flex items-center justify-center gap-2 cursor-pointer disabled:cursor-not-allowed"
+                          >
+                            {isRequestingWithdraw ? 'Processando...' : 'Solicitar Saque'}
+                          </button>
+                        </form>
+                      </>
+                    );
+                  })()}
                 </div>
               </div>
 

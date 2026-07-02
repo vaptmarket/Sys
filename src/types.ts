@@ -124,7 +124,7 @@ export interface Sale {
   saleValue: number;
   bonusPercent: number;
   bonusValue: number;
-  status: 'Pendente' | 'Aguardando Pagamento' | 'Finalizada';
+  status: 'Pendente' | 'Aguardando Pagamento' | 'Finalizada' | 'Liberado para Saque';
   createdAt: number;
 }
 
