@@ -33,8 +33,11 @@ import {
   Copy,
   ExternalLink,
   Share2,
-  DollarSign
+  DollarSign,
+  Users
 } from 'lucide-react';
+import { collection, query, where, getDocs } from 'firebase/firestore';
+import { db } from '../services/firebase';
 import { adService, couponService, companyService, categoryService, salesService, events, withdrawService, notificationService } from '../services/mockFirebase';
 import { Ad, UserCoupon, Company, Sale, WithdrawRequest, AppNotification } from '../types';
 import { Link, Navigate, useSearchParams } from 'react-router-dom';
@@ -68,6 +71,7 @@ export default function Profile() {
   const [viewHistory, setViewHistory] = React.useState<Ad[]>([]);
   const [availableCats, setAvailableCats] = React.useState<any[]>([]);
   const [referredCompanies, setReferredCompanies] = React.useState<Company[]>([]);
+  const [referredUsers, setReferredUsers] = React.useState<any[]>([]);
   const [affiliateSales, setAffiliateSales] = React.useState<Sale[]>([]);
   const [pixKeyInput, setPixKeyInput] = React.useState('');
   const [withdrawRequests, setWithdrawRequests] = React.useState<WithdrawRequest[]>([]);
@@ -360,6 +364,41 @@ export default function Profile() {
         setAffiliateSales(salesData);
         setWithdrawRequests(withdrawsData);
         setNotifications(notifsData);
+
+        // Fetch referred users from Firestore
+        let referredUsersData: any[] = [];
+        try {
+          const q = query(collection(db, 'users'), where('referredBy', '==', user.uid));
+          const querySnapshot = await getDocs(q);
+          querySnapshot.forEach((doc) => {
+            referredUsersData.push({ id: doc.id, ...doc.data() });
+          });
+        } catch (e) {
+          console.error('Error fetching referred users from firestore:', e);
+        }
+
+        // Merge with local storage fallback
+        const savedUsersStr = localStorage.getItem('vapt_registered_users');
+        if (savedUsersStr) {
+          try {
+            const registeredUsers = JSON.parse(savedUsersStr);
+            const localReferred = registeredUsers
+              .filter((u: any) => u.referredBy === user.uid)
+              .map((u: any) => ({
+                id: u.uid,
+                displayName: u.displayName || u.name || 'Usuário Vapt',
+                email: u.email,
+                role: u.role,
+                createdAt: u.createdAt || Date.now()
+              }));
+            
+            const allMerged = [...referredUsersData, ...localReferred];
+            const uniqueMap = new Map();
+            allMerged.forEach(item => uniqueMap.set(item.id, item));
+            referredUsersData = Array.from(uniqueMap.values());
+          } catch {}
+        }
+        setReferredUsers(referredUsersData);
       } catch (err) {
         console.error('Failed to fetch profile data:', err);
       } finally {
@@ -1702,8 +1741,39 @@ export default function Profile() {
                 </div>
               )}
 
-              {/* 2-Column Grid for Referred Companies & Sales List */}
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+              {/* Grid for Referred Users, Companies & Sales List */}
+              <div className="grid grid-cols-1 xl:grid-cols-3 gap-8">
+                {/* Users Referred Section */}
+                <div className="bg-surface-panel p-6 rounded-3xl border border-white/10 space-y-4">
+                  <h4 className="text-xs font-black text-white uppercase tracking-widest flex items-center gap-2 border-b border-white/5 pb-3">
+                    <Users size={14} className="text-brand-orange animate-pulse" />
+                    Usuários Indicados ({referredUsers.length})
+                  </h4>
+
+                  {referredUsers.length === 0 ? (
+                    <div className="py-8 text-center">
+                      <p className="text-[10px] text-white/30 font-bold uppercase tracking-wider">Nenhum usuário cadastrado ainda</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-3 max-h-[300px] overflow-y-auto pr-1">
+                      {referredUsers.map((u) => (
+                        <div key={u.id} className="flex items-center justify-between p-3 bg-white/[0.02] border border-white/5 rounded-xl">
+                          <div className="flex items-center gap-3">
+                            <div className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center text-xs font-bold text-white/60 shrink-0 uppercase border border-white/5">
+                              {getInitials(u.displayName || 'U')}
+                            </div>
+                            <div>
+                              <span className="block font-bold text-xs text-white line-clamp-1">{u.displayName}</span>
+                              <span className="block text-[8px] text-white/40 uppercase tracking-wider font-semibold">Conta {u.role === 'empresa' ? 'Empresa' : 'Cliente'}</span>
+                            </div>
+                          </div>
+                          <span className="text-[8px] text-white/30 font-mono font-semibold">{safeFormatDate(u.createdAt)}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
                 {/* Companies Referred Section */}
                 <div className="bg-surface-panel p-6 rounded-3xl border border-white/10 space-y-4">
                   <h4 className="text-xs font-black text-white uppercase tracking-widest flex items-center gap-2 border-b border-white/5 pb-3">

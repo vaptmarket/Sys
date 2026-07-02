@@ -15,6 +15,7 @@ export interface User {
   email: string;
   displayName: string;
   role: 'admin' | 'cliente' | 'empresa' | 'user';
+  referredBy?: string;
   pixKey?: string;
   phone?: string;
   cep?: string;
@@ -63,6 +64,7 @@ export function useAuth() {
           let neighborhood = '';
           let city = '';
           let state = '';
+          let referredBy = '';
           if (userSnap.exists()) {
             role = userSnap.data().role || role;
             pixKey = userSnap.data().pixKey || '';
@@ -74,15 +76,19 @@ export function useAuth() {
             neighborhood = userSnap.data().neighborhood || '';
             city = userSnap.data().city || '';
             state = userSnap.data().state || '';
+            referredBy = userSnap.data().referredBy || '';
           } else {
             // First time social login or email registration missing firestore doc
+            const refId = localStorage.getItem('vapt_referral_affiliate_id') || null;
             await setDoc(userDocRef, {
               uid: firebaseUser.uid,
               email: email,
               displayName: firebaseUser.displayName || 'Usuário Vapt',
               role: role,
+              referredBy: refId,
               createdAt: Date.now()
             }, { merge: true });
+            referredBy = refId || '';
           }
 
           const sessionUser: User = {
@@ -90,6 +96,7 @@ export function useAuth() {
             email: email,
             displayName: firebaseUser.displayName || 'Usuário Vapt',
             role: role,
+            referredBy: referredBy || undefined,
             pixKey: pixKey,
             phone: phone,
             cep: cep,
@@ -154,6 +161,7 @@ export function useAuth() {
       let neighborhood = '';
       let city = '';
       let state = '';
+      let referredBy = '';
       if (userSnap.exists()) {
         role = userSnap.data().role || role;
         pixKey = userSnap.data().pixKey || '';
@@ -165,14 +173,18 @@ export function useAuth() {
         neighborhood = userSnap.data().neighborhood || '';
         city = userSnap.data().city || '';
         state = userSnap.data().state || '';
+        referredBy = userSnap.data().referredBy || '';
       } else {
+        const refId = localStorage.getItem('vapt_referral_affiliate_id') || null;
         await setDoc(userDocRef, {
           uid: firebaseUser.uid,
           email: email,
           displayName: firebaseUser.displayName || 'Usuário Vapt',
           role: role,
+          referredBy: refId,
           createdAt: Date.now()
         });
+        referredBy = refId || '';
       }
 
       const sessionUser: User = {
@@ -180,6 +192,7 @@ export function useAuth() {
         email: email,
         displayName: firebaseUser.displayName || 'Usuário Vapt',
         role: role,
+        referredBy: referredBy || undefined,
         pixKey: pixKey,
         phone: phone,
         cep: cep,
@@ -224,6 +237,7 @@ export function useAuth() {
       let neighborhood = '';
       let city = '';
       let state = '';
+      let referredBy = '';
       if (targetEmail.includes('admin') || targetEmail === 'joao@exemplo.com' || targetEmail === 'aplicativo.vaptmarket@gmail.com') {
         role = 'admin';
       }
@@ -239,6 +253,7 @@ export function useAuth() {
         neighborhood = userSnap.data().neighborhood || '';
         city = userSnap.data().city || '';
         state = userSnap.data().state || '';
+        referredBy = userSnap.data().referredBy || '';
       }
 
       const sessionUser: User = {
@@ -246,6 +261,7 @@ export function useAuth() {
         email: targetEmail,
         displayName: firebaseUser.displayName || 'Usuário Vapt',
         role: role,
+        referredBy: referredBy || undefined,
         pixKey: pixKey,
         phone: phone,
         cep: cep,
@@ -309,6 +325,8 @@ export function useAuth() {
         role = 'admin';
       }
 
+      const referredBy = localStorage.getItem('vapt_referral_affiliate_id') || undefined;
+
       // Save to Firestore
       const userDocRef = doc(db, 'users', firebaseUser.uid);
       await setDoc(userDocRef, {
@@ -316,6 +334,7 @@ export function useAuth() {
         email: targetEmail,
         displayName: targetName,
         role: role,
+        referredBy: referredBy || null,
         createdAt: Date.now()
       });
 
@@ -323,7 +342,8 @@ export function useAuth() {
         uid: firebaseUser.uid,
         email: targetEmail,
         displayName: targetName,
-        role: role
+        role: role,
+        referredBy: referredBy
       };
 
       setUser(sessionUser);
@@ -338,7 +358,8 @@ export function useAuth() {
           email: targetEmail,
           displayName: targetName,
           role: role,
-          password: targetPassword
+          password: targetPassword,
+          referredBy: referredBy || null
         });
         localStorage.setItem('vapt_registered_users', JSON.stringify(registeredUsers));
       }
