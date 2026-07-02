@@ -617,7 +617,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                         className="fixed inset-0 z-40" 
                         onClick={() => setShowNotifications(false)}
                       />
-                      <div className="absolute right-0 mt-3 w-80 bg-surface-panel border border-white/10 rounded-2xl shadow-2xl z-50 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200">
+                      <div className="fixed md:absolute left-4 right-4 md:left-auto md:right-0 top-[72px] md:top-auto md:mt-3 w-auto md:w-80 max-w-[calc(100vw-2rem)] md:max-w-none bg-surface-panel border border-white/10 rounded-2xl shadow-2xl z-50 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200">
                         <div className="p-4 border-b border-white/10 flex items-center justify-between">
                           <h3 className="text-xs font-black uppercase tracking-widest italic text-white/60">Notificações</h3>
                           <button 
