@@ -1,0 +1,63 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#121214" />
+      <stop offset="100%" stop-color="#0A0A0B" />
+    </linearGradient>
+    <linearGradient id="circleGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#69bd60" />
+      <stop offset="100%" stop-color="#4e9946" />
+    </linearGradient>
+    <linearGradient id="blueGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0066FF" />
+      <stop offset="100%" stop-color="#0044BB" />
+    </linearGradient>
+    <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="10" result="blur" />
+      <feComposite in="SourceGraphic" in2="blur" operator="over" />
+    </filter>
+  </defs>
+
+  <!-- Background -->
+  <rect width="512" height="512" rx="128" fill="url(#bgGrad)" stroke="#1F1F23" stroke-width="8" />
+
+  <!-- Accent Circle behind -->
+  <circle cx="256" cy="256" r="180" fill="none" stroke="#0066FF" stroke-width="4" stroke-dasharray="16 12" opacity="0.3" />
+
+  <!-- Core Logo Circles (staggered Vapt Market symbol) -->
+  <g transform="translate(140, 150) scale(1.6)" filter="url(#glow)">
+    <!-- First column single circle -->
+    <circle cx="30" cy="55" r="22" fill="url(#circleGrad)" />
+    
+    <!-- Second column two circles -->
+    <circle cx="65" cy="35" r="22" fill="url(#blueGrad)" />
+    <circle cx="65" cy="75" r="22" fill="url(#circleGrad)" />
+  </g>
+
+  <!-- Text elements -->
+  <text 
+    x="256" 
+    y="390" 
+    font-family="'Montserrat', 'Inter', sans-serif" 
+    font-weight="900" 
+    font-size="42" 
+    fill="#FFFFFF"
+    letter-spacing="2"
+    text-anchor="middle"
+  >
+    VAPT
+  </text>
+  <text 
+    x="256" 
+    y="430" 
+    font-family="'Montserrat', 'Inter', sans-serif" 
+    font-weight="800" 
+    font-size="28" 
+    fill="#69bd60"
+    font-style="italic"
+    letter-spacing="4"
+    text-anchor="middle"
+  >
+    MARKET
+  </text>
+</svg>
